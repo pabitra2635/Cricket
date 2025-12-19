@@ -12,6 +12,7 @@
         .border-brand-primary { border-color: #F7631B; }
         .loader { border: 3px solid #f3f3f3; border-top: 3px solid #F7631B; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .break-overlay { background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen font-sans">
@@ -47,7 +48,6 @@
             </div>
             
             <div class="space-y-4 flex-grow">
-                <!-- Resume Active Match Section -->
                 <div id="resume-container" class="hidden animate-bounce">
                     <button onclick="resumeMatch()" class="w-full bg-green-50 border-2 border-green-500 text-green-700 p-4 rounded-xl flex items-center justify-between shadow-sm">
                         <div class="text-left">
@@ -106,12 +106,14 @@
         </div>
 
         <!-- Viewer Screen -->
-        <div id="viewer-screen" class="hidden flex-grow flex flex-col">
+        <div id="viewer-screen" class="hidden flex-grow flex flex-col relative">
              <div class="bg-gray-900 text-white p-6 text-center">
-                <div class="flex justify-between items-center mb-2">
+                <div class="flex justify-between items-center mb-1">
                     <span id="v-display-teams" class="text-sm font-medium text-gray-400 uppercase tracking-widest">Loading...</span>
                     <span id="v-display-target" class="text-sm text-[#F7631B] font-bold hidden uppercase">TARGET: 0</span>
                 </div>
+                <div id="v-start-time-label" class="text-[10px] text-gray-500 mb-2 uppercase tracking-widest">Started: --:--</div>
+                
                 <div class="text-5xl font-black mb-1">
                     <span id="v-runs">0</span>/<span id="v-wickets">0</span>
                 </div>
@@ -123,6 +125,14 @@
                     <div id="v-rrr-box" class="text-center hidden"><p class="text-gray-500 uppercase">Req Rate</p><p class="text-lg font-bold text-[#F7631B]" id="v-rrr">0.00</p></div>
                 </div>
             </div>
+
+            <!-- Viewer Break Overlay -->
+            <div id="v-break-overlay" class="hidden absolute inset-0 z-10 break-overlay flex flex-col items-center justify-center text-white text-center p-6">
+                <div id="v-overlay-icon" class="text-4xl mb-4">☕</div>
+                <h3 id="v-overlay-title" class="text-2xl font-black uppercase tracking-tighter">Match on Break</h3>
+                <p id="v-overlay-desc" class="text-sm text-gray-300 mt-2">Waiting for teams to resume play...</p>
+            </div>
+
             <div class="p-4 bg-gray-50 border-b flex flex-col gap-2">
                 <span class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Current Over History</span>
                 <div id="v-over-history" class="flex gap-1 overflow-x-auto py-1"></div>
@@ -135,12 +145,13 @@
         </div>
 
         <!-- Scoring Screen -->
-        <div id="scoring-screen" class="hidden flex-grow flex flex-col">
+        <div id="scoring-screen" class="hidden flex-grow flex flex-col relative">
             <div class="bg-gray-900 text-white p-6 text-center">
-                <div class="flex justify-between items-center mb-2">
+                <div class="flex justify-between items-center mb-1">
                     <span id="display-teams" class="text-sm font-medium text-gray-400 uppercase tracking-widest">Loading...</span>
                     <span id="display-target" class="text-sm text-[#F7631B] font-bold hidden uppercase">TARGET: 0</span>
                 </div>
+                <div id="start-time-label" class="text-[10px] text-gray-500 mb-2 uppercase tracking-widest">Started: --:--</div>
                 <div class="text-5xl font-black mb-1"><span id="runs">0</span>/<span id="wickets">0</span></div>
                 <div class="text-lg text-gray-400">Overs: <span id="overs">0.0</span> / <span id="limit">5</span></div>
                 <div class="mt-2 text-xs text-gray-500 flex justify-center gap-4">
@@ -148,6 +159,22 @@
                     <span id="rrr-container" class="hidden">RRR: <span id="rrr">0.00</span></span>
                 </div>
             </div>
+
+            <!-- Scorer Break Overlay -->
+            <div id="break-overlay" class="hidden absolute inset-0 z-20 break-overlay flex flex-col items-center justify-center text-white text-center p-6">
+                <div class="text-5xl mb-4">⏸️</div>
+                <h3 class="text-2xl font-black uppercase tracking-tighter">Match Paused</h3>
+                <p class="text-sm text-gray-300 mt-2 mb-8">Scoring is disabled during break.</p>
+                <div class="flex flex-col gap-3 w-full max-w-[200px]">
+                    <button onclick="toggleBreak()" class="w-full bg-brand-primary text-white font-bold py-4 rounded-xl shadow-xl uppercase tracking-widest animate-pulse">
+                        Resume Play
+                    </button>
+                    <button onclick="abandonMatch()" class="w-full bg-gray-700 text-gray-300 font-bold py-3 rounded-xl uppercase text-xs">
+                        Abandon Match
+                    </button>
+                </div>
+            </div>
+
             <div class="p-3 bg-gray-200 border-b flex items-center gap-2 overflow-x-auto">
                 <span class="text-[10px] font-bold text-gray-500 uppercase">This Over:</span>
                 <div id="over-history" class="flex gap-1"></div>
@@ -164,16 +191,17 @@
                 <button onclick="addWicket()" class="col-span-4 bg-red-600 text-white hover:bg-red-700 h-16 rounded-lg font-black text-xl shadow-lg uppercase tracking-widest active:scale-95">WICKET!</button>
             </div>
             <div class="p-4 bg-gray-50 flex items-center gap-2">
-                <button onclick="undoLast()" class="flex-1 py-3 text-xs font-bold text-gray-500 border rounded-lg bg-white hover:bg-gray-100 transition-all shadow-sm uppercase">Undo</button>
-                <button onclick="redoLast()" class="flex-1 py-3 text-xs font-bold text-[#F7631B] border border-orange-100 rounded-lg bg-white hover:bg-orange-50 transition-all shadow-sm uppercase">Redo</button>
+                <button onclick="undoLast()" class="flex-1 py-3 text-[10px] font-bold text-gray-500 border rounded-lg bg-white hover:bg-gray-100 uppercase">Undo</button>
+                <button onclick="toggleBreak()" class="flex-1 py-3 text-[10px] font-bold text-blue-600 border border-blue-100 rounded-lg bg-white hover:bg-blue-50 uppercase">Break</button>
+                <button onclick="redoLast()" class="flex-1 py-3 text-[10px] font-bold text-[#F7631B] border border-orange-100 rounded-lg bg-white hover:bg-orange-50 uppercase">Redo</button>
                 <div id="save-loader" class="hidden shrink-0"><div class="loader"></div></div>
             </div>
         </div>
 
         <!-- Result Screen -->
         <div id="result-screen" class="hidden p-8 text-center flex-grow flex flex-col justify-center">
-            <div class="text-6xl mb-4">🏆</div>
-            <h2 class="text-2xl font-black text-gray-800 mb-2 uppercase">Match Finished!</h2>
+            <div id="result-emoji" class="text-6xl mb-4">🏆</div>
+            <h2 id="result-header" class="text-2xl font-black text-gray-800 mb-2 uppercase">Match Finished!</h2>
             <p id="winner-text" class="text-xl font-bold text-[#F7631B] mb-6"></p>
             <div id="final-stats" class="bg-gray-100 p-4 rounded-lg mb-8 text-left space-y-2 text-sm"></div>
             <button onclick="location.reload()" class="w-full bg-brand-primary text-white py-4 rounded-xl font-bold uppercase shadow-lg">New Match</button>
@@ -210,7 +238,9 @@
         let match = {
             battingTeam: "", bowlingTeam: "", maxOvers: 5,
             innings: 1, target: null, runs: 0, wickets: 0,
-            balls: 0, history: [], redoStack: [], overHistory: [] 
+            balls: 0, history: [], redoStack: [], overHistory: [],
+            startTime: null, endTime: null, isOnBreak: false,
+            isAbandoned: false
         };
 
         const initAuth = async () => {
@@ -232,6 +262,7 @@
         const backBtn = document.getElementById('global-back-btn');
         const resumeContainer = document.getElementById('resume-container');
         const resumeInfo = document.getElementById('resume-match-info');
+        const breakOverlay = document.getElementById('break-overlay');
 
         async function checkForActiveMatch() {
             if (!user) return;
@@ -240,7 +271,7 @@
                 const querySnapshot = await getDocs(q);
                 const matches = [];
                 querySnapshot.forEach(doc => matches.push({id: doc.id, ...doc.data()}));
-                const active = matches.find(m => m.scorerId === user.uid && m.status === "Live");
+                const active = matches.find(m => m.scorerId === user.uid && m.status !== "Finished" && m.status !== "Abandoned");
                 if (active) {
                     activeMatchData = active;
                     resumeInfo.innerText = `${active.battingTeam} vs ${active.bowlingTeam}`;
@@ -265,7 +296,11 @@
                 balls: activeMatchData.balls,
                 history: activeMatchData.history || [],
                 redoStack: activeMatchData.redoStack || [],
-                overHistory: activeMatchData.overHistory || []
+                overHistory: activeMatchData.overHistory || [],
+                startTime: activeMatchData.startTime || null,
+                endTime: activeMatchData.endTime || null,
+                isOnBreak: activeMatchData.isOnBreak || false,
+                isAbandoned: activeMatchData.isAbandoned || false
             };
             setupScreen.classList.add('hidden');
             scoringScreen.classList.remove('hidden');
@@ -274,9 +309,51 @@
             updateDisplay();
         };
 
+        window.toggleBreak = async function() {
+            match.isOnBreak = !match.isOnBreak;
+            updateDisplay();
+            await syncToCloud();
+        };
+
+        window.abandonMatch = async function() {
+            if (confirm("Are you sure you want to abandon this match? This cannot be undone.")) {
+                match.isAbandoned = true;
+                match.isOnBreak = false;
+                match.endTime = new Date().toISOString();
+                
+                scoringScreen.classList.add('hidden');
+                resultScreen.classList.remove('hidden');
+                backBtn.classList.remove('hidden');
+                
+                document.getElementById('result-emoji').innerText = "☁️";
+                document.getElementById('result-header').innerText = "Match Abandoned";
+                document.getElementById('winner-text').innerText = "No Result";
+                document.getElementById('winner-text').className = "text-xl font-bold text-gray-500 mb-6";
+                
+                const startStr = match.startTime ? new Date(match.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--';
+                const endStr = match.endTime ? new Date(match.endTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--';
+
+                document.getElementById('final-stats').innerHTML = `
+                    <div class="grid grid-cols-2 gap-2 mb-4">
+                        <div class="bg-gray-50 p-2 rounded">
+                            <p class="text-[10px] uppercase text-gray-400 font-bold">Start</p>
+                            <p class="text-sm font-bold text-gray-700">${startStr}</p>
+                        </div>
+                        <div class="bg-gray-50 p-2 rounded">
+                            <p class="text-[10px] uppercase text-gray-400 font-bold">Ended</p>
+                            <p class="text-sm font-bold text-gray-700">${endStr}</p>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 italic mb-2">The match was called off before completion.</p>
+                    <p><strong>Final State:</strong> ${match.runs}/${match.wickets} in ${formatOvers(match.balls)} overs.</p>
+                `;
+                await syncToCloud();
+            }
+        };
+
         window.handleGlobalBack = function() {
             if (!scoringScreen.classList.contains('hidden')) {
-                if (confirm("Exit scoring? You can resume this match later from the setup screen.")) {
+                if (confirm("Exit scoring? Match will stay active in the cloud.")) {
                     resetAppState();
                     scoringScreen.classList.add('hidden');
                     setupScreen.classList.remove('hidden');
@@ -297,7 +374,9 @@
             match = {
                 battingTeam: "", bowlingTeam: "", maxOvers: 5,
                 innings: 1, target: null, runs: 0, wickets: 0,
-                balls: 0, history: [], redoStack: [], overHistory: [] 
+                balls: 0, history: [], redoStack: [], overHistory: [],
+                startTime: null, endTime: null, isOnBreak: false,
+                isAbandoned: false
             };
         }
 
@@ -307,6 +386,7 @@
             if(bTeam === boTeam) { alert("Teams must be different!"); return; }
             match.battingTeam = bTeam; match.bowlingTeam = boTeam;
             match.maxOvers = parseInt(document.getElementById('max-overs').value);
+            match.startTime = new Date().toISOString();
             currentMatchId = "match_" + Date.now();
             setupScreen.classList.add('hidden');
             scoringScreen.classList.remove('hidden');
@@ -321,10 +401,15 @@
             document.getElementById('save-loader').classList.remove('hidden');
             syncStatus.classList.replace('bg-green-400', 'bg-yellow-400');
             try {
+                let statusStr = "Live";
+                if (match.isAbandoned) statusStr = "Abandoned";
+                else if (!resultScreen.classList.contains('hidden')) statusStr = "Finished";
+                else if (match.isOnBreak) statusStr = "On Break";
+
                 const matchRef = doc(db, 'artifacts', appId, 'public', 'data', 'matches', currentMatchId);
                 await setDoc(matchRef, {
                     ...match, lastUpdated: serverTimestamp(), scorerId: user.uid,
-                    status: (resultScreen.classList.contains('hidden')) ? "Live" : "Finished"
+                    status: statusStr
                 });
                 syncStatus.classList.replace('bg-yellow-400', 'bg-green-400');
             } catch (err) {
@@ -335,18 +420,21 @@
         }
 
         window.addScore = async function(r) {
+            if (match.isOnBreak || match.isAbandoned) return;
             saveState();
             match.runs += r; match.balls++; match.overHistory.push(r);
             checkInningsStatus(); updateDisplay(); await syncToCloud();
         };
 
         window.addExtra = async function(type) {
+            if (match.isOnBreak || match.isAbandoned) return;
             saveState();
             match.runs += 1; match.overHistory.push(type);
             updateDisplay(); await syncToCloud();
         };
 
         window.addWicket = async function() {
+            if (match.isOnBreak || match.isAbandoned) return;
             saveState();
             match.wickets++; match.balls++; match.overHistory.push('W');
             checkInningsStatus(); updateDisplay(); await syncToCloud();
@@ -376,14 +464,31 @@
         }
 
         function endMatch(winner) {
+            match.endTime = new Date().toISOString();
+            match.isOnBreak = false;
             scoringScreen.classList.add('hidden'); resultScreen.classList.remove('hidden');
             backBtn.classList.remove('hidden');
             document.getElementById('winner-text').innerText = winner;
+            document.getElementById('result-emoji').innerText = "🏆";
+            document.getElementById('result-header').innerText = "Match Finished!";
+            document.getElementById('winner-text').className = "text-xl font-bold text-[#F7631B] mb-6";
+            
+            const startStr = match.startTime ? new Date(match.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--';
+            const endStr = match.endTime ? new Date(match.endTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--';
+
             document.getElementById('final-stats').innerHTML = `
-                <p><strong>Team Batting:</strong> ${match.battingTeam}</p>
-                <p><strong>Score:</strong> ${match.runs}/${match.wickets}</p>
-                <p><strong>Overs:</strong> ${formatOvers(match.balls)}</p>
+                <div class="grid grid-cols-2 gap-2 mb-4">
+                    <div class="bg-gray-50 p-2 rounded">
+                        <p class="text-[10px] uppercase text-gray-400 font-bold">Match Start</p>
+                        <p class="text-sm font-bold text-gray-700">${startStr}</p>
+                    </div>
+                    <div class="bg-gray-50 p-2 rounded">
+                        <p class="text-[10px] uppercase text-gray-400 font-bold">Match End</p>
+                        <p class="text-sm font-bold text-gray-700">${endStr}</p>
+                    </div>
+                </div>
                 <p><strong>Result:</strong> ${winner}</p>
+                <p><strong>Score:</strong> ${match.runs}/${match.wickets} (${formatOvers(match.balls)})</p>
             `;
             syncToCloud();
         }
@@ -394,12 +499,27 @@
             document.getElementById('wickets').innerText = match.wickets;
             document.getElementById('overs').innerText = formatOvers(match.balls);
             document.getElementById('limit').innerText = match.maxOvers;
+            
+            if (match.isOnBreak) breakOverlay.classList.remove('hidden');
+            else breakOverlay.classList.add('hidden');
+
+            const startLabel = document.getElementById('start-time-label');
+            if (match.startTime) {
+                const time = new Date(match.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                startLabel.innerText = `Started: ${time}`;
+            }
+
             if (match.target) {
                 document.getElementById('display-target').innerText = `TARGET: ${match.target}`;
+                document.getElementById('display-target').classList.remove('hidden');
+                document.getElementById('rrr-container').classList.remove('hidden');
                 const ballsLeft = (match.maxOvers * 6) - match.balls;
                 const runsNeeded = match.target - match.runs;
                 const rrr = ballsLeft > 0 ? (runsNeeded / (ballsLeft / 6)).toFixed(2) : "0.00";
                 document.getElementById('rrr').innerText = rrr;
+            } else {
+                document.getElementById('display-target').classList.add('hidden');
+                document.getElementById('rrr-container').classList.add('hidden');
             }
             const crr = match.balls > 0 ? (match.runs / (match.balls / 6)).toFixed(2) : "0.00";
             document.getElementById('crr').innerText = crr;
@@ -443,7 +563,7 @@
         }
 
         window.undoLast = async function() {
-            if (match.history.length === 0) return;
+            if (match.history.length === 0 || match.isOnBreak) return;
             match.redoStack.push(JSON.stringify({
                 runs: match.runs, wickets: match.wickets, balls: match.balls, overHistory: [...match.overHistory]
             }));
@@ -454,7 +574,7 @@
         };
 
         window.redoLast = async function() {
-            if (match.redoStack.length === 0) return;
+            if (match.redoStack.length === 0 || match.isOnBreak) return;
             match.history.push(JSON.stringify({
                 runs: match.runs, wickets: match.wickets, balls: match.balls, overHistory: [...match.overHistory]
             }));
@@ -469,104 +589,99 @@
             historyScreen.classList.remove('hidden');
             backBtn.classList.remove('hidden'); 
             resumeContainer.classList.add('hidden');
-            
             const list = document.getElementById('history-list');
             list.innerHTML = '<div class="text-center py-10 text-xs text-gray-400">Connecting to Tournament Stream...</div>';
-
             const q = collection(db, 'artifacts', appId, 'public', 'data', 'matches');
-            
             unsubscribeHistory = onSnapshot(q, (querySnapshot) => {
                 let matches = [];
                 querySnapshot.forEach(doc => matches.push({id: doc.id, ...doc.data()}));
                 matches.sort((a, b) => (b.lastUpdated?.seconds || 0) - (a.lastUpdated?.seconds || 0));
+                if (matches.length === 0) { list.innerHTML = '<div class="text-center py-10 text-gray-400">No matches found.</div>'; return; }
+                list.innerHTML = matches.map(m => {
+                    const sTime = m.startTime ? new Date(m.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--';
+                    const eTime = m.endTime ? new Date(m.endTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--';
+                    
+                    let statusColor = 'bg-gray-100 text-gray-600';
+                    if (m.status === 'Live') statusColor = 'bg-green-100 text-green-700 animate-pulse';
+                    else if (m.status === 'On Break') statusColor = 'bg-blue-100 text-blue-700';
+                    else if (m.status === 'Abandoned') statusColor = 'bg-red-50 text-red-400';
 
-                if (matches.length === 0) {
-                    list.innerHTML = '<div class="text-center py-10 text-gray-400">No match records found.</div>';
-                    return;
-                }
-
-                list.innerHTML = matches.map(m => `
-                    <div class="bg-white border rounded-xl p-4 shadow-sm border-l-4 border-l-[#F7631B] transition-all">
-                        <div class="flex justify-between items-start mb-2">
-                            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                                ${m.lastUpdated ? new Date(m.lastUpdated.seconds * 1000).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}) : 'Syncing...'}
-                            </span>
-                            <span class="px-2 py-0.5 rounded-full text-[9px] font-bold ${m.status === 'Live' ? 'bg-green-100 text-green-700 animate-pulse' : 'bg-gray-100 text-gray-600'}">
-                                ${m.status}
-                            </span>
-                        </div>
-                        <div class="flex justify-between items-center mb-3">
-                            <div><h3 class="font-bold text-gray-800">${m.battingTeam} vs ${m.bowlingTeam}</h3><p class="text-xs text-gray-500">${m.maxOvers} Overs</p></div>
-                            <div class="text-right">
-                                <p class="text-xl font-black text-gray-900">${m.runs}/${m.wickets}</p>
-                                <p class="text-[10px] text-gray-500">${Math.floor(m.balls/6)}.${m.balls%6} Overs</p>
+                    return `
+                        <div class="bg-white border rounded-xl p-4 shadow-sm border-l-4 border-l-[#F7631B]">
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="flex flex-col"><span class="text-[10px] font-bold text-gray-400 uppercase">${m.startTime ? new Date(m.startTime).toLocaleDateString([], {month:'short', day:'numeric'}) : 'Today'}</span>
+                                <span class="text-[9px] text-gray-500">${sTime} ${m.endTime ? ' - ' + eTime : ''}</span></div>
+                                <span class="px-2 py-0.5 rounded-full text-[9px] font-bold ${statusColor}">${m.status}</span>
                             </div>
+                            <div class="flex justify-between items-center mb-3">
+                                <div><h3 class="font-bold text-gray-800">${m.battingTeam} vs ${m.bowlingTeam}</h3></div>
+                                <div class="text-right"><p class="text-xl font-black text-gray-900">${m.runs}/${m.wickets}</p><p class="text-[10px] text-gray-500">${formatOvers(m.balls)} Overs</p></div>
+                            </div>
+                            <button onclick="startWatching('${m.id}')" class="w-full py-2 text-xs font-bold text-brand-primary border border-orange-100 bg-orange-50 rounded-lg uppercase">View Scorecard</button>
                         </div>
-                        <button onclick="startWatching('${m.id}')" class="w-full py-2 text-xs font-bold text-brand-primary border border-orange-200 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors uppercase tracking-widest">
-                            ${m.status === 'Live' ? 'Watch Live Score' : 'View Final Result'}
-                        </button>
-                    </div>
-                `).join('');
-            }, (err) => {
-                list.innerHTML = `<div class="text-red-500 text-center py-10">Stream Error: ${err.message}</div>`;
+                    `;
+                }).join('');
             });
         };
 
         window.startWatching = function(matchId) {
-            // Stop the history listener and hide it
             if (unsubscribeHistory) unsubscribeHistory();
             unsubscribeHistory = null;
             historyScreen.classList.add('hidden');
-            
-            // Ensure Setup remains hidden and show viewer
             setupScreen.classList.add('hidden'); 
             viewerScreen.classList.remove('hidden');
             backBtn.classList.remove('hidden');
-            
-            headerSubtitle.innerText = "Watching Live Stream"; 
-            headerSubtitle.classList.replace('text-orange-100', 'text-green-300');
-            
+            headerSubtitle.innerText = "Watching Live Stream"; headerSubtitle.classList.replace('text-orange-100', 'text-green-300');
             const matchRef = doc(db, 'artifacts', appId, 'public', 'data', 'matches', matchId);
             unsubscribeMatch = onSnapshot(matchRef, (docSnap) => {
                 if (docSnap.exists()) updateViewerUI(docSnap.data());
-                else { alert("Match data no longer exists."); stopWatching(); }
-            }, (err) => { alert("Disconnected from live stream."); stopWatching(); });
+                else { alert("Match ended."); stopWatching(); }
+            });
         };
 
         function updateViewerUI(data) {
             document.getElementById('v-display-teams').innerText = `${data.battingTeam} vs ${data.bowlingTeam}`;
             document.getElementById('v-runs').innerText = data.runs; document.getElementById('v-wickets').innerText = data.wickets;
             document.getElementById('v-overs').innerText = formatOvers(data.balls); document.getElementById('v-limit').innerText = data.maxOvers;
+            
+            const vBreak = document.getElementById('v-break-overlay');
+            if (data.status === "On Break" || data.status === "Abandoned") {
+                vBreak.classList.remove('hidden');
+                if (data.status === "Abandoned") {
+                    document.getElementById('v-overlay-icon').innerText = "☁️";
+                    document.getElementById('v-overlay-title').innerText = "Match Abandoned";
+                    document.getElementById('v-overlay-desc').innerText = "This match was called off.";
+                } else {
+                    document.getElementById('v-overlay-icon').innerText = "☕";
+                    document.getElementById('v-overlay-title').innerText = "Match on Break";
+                    document.getElementById('v-overlay-desc').innerText = "Waiting for teams to resume play...";
+                }
+            } else vBreak.classList.add('hidden');
+
+            if (data.startTime) document.getElementById('v-start-time-label').innerText = `Started: ${new Date(data.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
             if (data.target) {
                 document.getElementById('v-display-target').innerText = `TARGET: ${data.target}`;
                 document.getElementById('v-display-target').classList.remove('hidden');
                 document.getElementById('v-rrr-box').classList.remove('hidden');
-                const ballsLeft = (data.maxOvers * 6) - data.balls; const runsNeeded = data.target - data.runs;
-                const rrr = ballsLeft > 0 ? (runsNeeded / (ballsLeft / 6)).toFixed(2) : "0.00";
-                document.getElementById('v-rrr').innerText = rrr;
+                const bl = (data.maxOvers * 6) - data.balls; const rr = bl > 0 ? ((data.target - data.runs) / (bl / 6)).toFixed(2) : "0.00";
+                document.getElementById('v-rrr').innerText = rr;
             } else {
                 document.getElementById('v-display-target').classList.add('hidden');
                 document.getElementById('v-rrr-box').classList.add('hidden');
             }
-            const crr = data.balls > 0 ? (data.runs / (data.balls / 6)).toFixed(2) : "0.00";
-            document.getElementById('v-crr').innerText = crr;
+            document.getElementById('v-crr').innerText = data.balls > 0 ? (data.runs / (data.balls / 6)).toFixed(2) : "0.00";
             renderBalls(document.getElementById('v-over-history'), data.balls, data.overHistory || []);
         }
 
         window.stopWatching = function() {
             if (unsubscribeMatch) unsubscribeMatch(); unsubscribeMatch = null;
-            viewerScreen.classList.add('hidden'); 
-            showHistory(); // Return to live history list
+            viewerScreen.classList.add('hidden'); showHistory(); 
             headerSubtitle.innerText = "Live Cloud Sync Active"; headerSubtitle.classList.replace('text-green-300', 'text-orange-100');
         };
 
         window.hideHistory = function() { 
-            if (unsubscribeHistory) unsubscribeHistory();
-            unsubscribeHistory = null;
-            historyScreen.classList.add('hidden'); 
-            setupScreen.classList.remove('hidden'); 
-            backBtn.classList.add('hidden'); 
-            checkForActiveMatch();
+            if (unsubscribeHistory) unsubscribeHistory(); unsubscribeHistory = null;
+            historyScreen.classList.add('hidden'); setupScreen.classList.remove('hidden'); backBtn.classList.add('hidden'); checkForActiveMatch();
         };
     </script>
 </body>
