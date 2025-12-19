@@ -99,9 +99,15 @@
                     Start New Match
                 </button>
 
-                <button onclick="showHistory()" class="w-full bg-gray-100 text-gray-600 font-bold py-3 rounded-xl border border-gray-300 transition-transform active:scale-95 uppercase text-sm">
-                    View Match History
-                </button>
+                <div class="pt-2">
+                    <button onclick="showHistory()" class="w-full bg-white text-gray-700 font-bold py-4 rounded-xl border-2 border-gray-200 transition-all active:scale-95 uppercase text-xs flex items-center justify-center gap-3 shadow-sm hover:border-orange-200">
+                        <span class="relative flex h-3 w-3">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                        </span>
+                        View Live Scores & History
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -650,20 +656,37 @@
             unsubscribeHistory = onSnapshot(q, (querySnapshot) => {
                 let matches = [];
                 querySnapshot.forEach(doc => matches.push({id: doc.id, ...doc.data()}));
-                matches.sort((a, b) => (b.lastUpdated?.seconds || 0) - (a.lastUpdated?.seconds || 0));
+                
+                // Sort by Start Time (Newest First)
+                matches.sort((a, b) => {
+                    const timeA = a.startTime ? new Date(a.startTime).getTime() : 0;
+                    const timeB = b.startTime ? new Date(b.startTime).getTime() : 0;
+                    return timeB - timeA;
+                });
                 
                 if (matches.length === 0) { 
                     list.innerHTML = '<div class="text-center py-10 text-gray-400">No match records found.</div>'; 
                     return; 
                 }
 
-                list.innerHTML = matches.map(m => {
+                const live = matches.filter(m => m.status === 'Live' || m.status === 'On Break');
+                const past = matches.filter(m => m.status !== 'Live' && m.status !== 'On Break');
+
+                const renderCard = (m) => {
                     const sT = m.startTime ? new Date(m.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--';
                     const eT = m.endTime ? new Date(m.endTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
                     let sCol = 'bg-gray-100 text-gray-600';
-                    if (m.status === 'Live') sCol = 'bg-green-100 text-green-700 animate-pulse';
-                    else if (m.status === 'On Break') sCol = 'bg-blue-100 text-blue-700';
-                    else if (m.status === 'Abandoned') sCol = 'bg-red-50 text-red-400';
+                    let btnText = "View Match Summary";
+                    
+                    if (m.status === 'Live') {
+                        sCol = 'bg-green-100 text-green-700 animate-pulse';
+                        btnText = "View Live Score";
+                    } else if (m.status === 'On Break') {
+                        sCol = 'bg-blue-100 text-blue-700';
+                        btnText = "View Live Score";
+                    } else if (m.status === 'Abandoned') {
+                        sCol = 'bg-red-50 text-red-400';
+                    }
 
                     return `
                         <div class="bg-white border rounded-xl p-4 shadow-sm border-l-4 border-l-[#F7631B]">
@@ -681,10 +704,22 @@
                                     <p class="text-[10px] text-gray-500">${formatOvers(m.balls)} Overs</p>
                                 </div>
                             </div>
-                            <button onclick="startWatching('${m.id}')" class="w-full py-2 text-xs font-bold text-brand-primary border border-orange-100 bg-orange-50 rounded-lg uppercase tracking-tight">View Live Score</button>
+                            <button onclick="startWatching('${m.id}')" class="w-full py-2 text-xs font-bold text-brand-primary border border-orange-100 bg-orange-50 rounded-lg uppercase tracking-tight">${btnText}</button>
                         </div>
                     `;
-                }).join('');
+                };
+
+                let finalHtml = '';
+                if (live.length > 0) {
+                    finalHtml += `<div class="mb-2"><h3 class="text-[10px] font-black text-green-600 uppercase tracking-widest mb-3 flex items-center gap-2">Live Now</h3></div>`;
+                    finalHtml += live.map(m => renderCard(m)).join('');
+                }
+                if (past.length > 0) {
+                    finalHtml += `<div class="mt-6 mb-2"><h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Past Matches</h3></div>`;
+                    finalHtml += past.map(m => renderCard(m)).join('');
+                }
+                list.innerHTML = finalHtml || '<div class="text-center py-10 text-gray-400">No match records found.</div>';
+
             }, (err) => {
                 showToast("Stream lost. Please back and return.", "error");
             });
