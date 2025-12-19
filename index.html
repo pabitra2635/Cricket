@@ -13,6 +13,11 @@
         .loader { border: 3px solid #f3f3f3; border-top: 3px solid #F7631B; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .break-overlay { background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); }
+        
+        /* Toast Animation */
+        .toast-enter { transform: translateY(100%); opacity: 0; }
+        .toast-active { transform: translateY(0); opacity: 1; transition: all 0.3s ease-out; }
+        .toast-exit { transform: translateY(20px); opacity: 0; transition: all 0.3s ease-in; }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen font-sans">
@@ -206,6 +211,9 @@
             <div id="final-stats" class="bg-gray-100 p-4 rounded-lg mb-8 text-left space-y-2 text-sm"></div>
             <button onclick="location.reload()" class="w-full bg-brand-primary text-white py-4 rounded-xl font-bold uppercase shadow-lg">New Match</button>
         </div>
+
+        <!-- Toast Container -->
+        <div id="toast-container" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 w-full max-w-xs px-4 pointer-events-none"></div>
     </div>
 
     <!-- Firebase SDKs -->
@@ -241,6 +249,33 @@
             balls: 0, history: [], redoStack: [], overHistory: [],
             startTime: null, endTime: null, isOnBreak: false,
             isAbandoned: false
+        };
+
+        // --- Toast System ---
+        window.showToast = function(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const colors = {
+                error: 'bg-red-600',
+                success: 'bg-green-600',
+                info: 'bg-gray-800',
+                warning: 'bg-orange-500'
+            };
+
+            toast.className = `${colors[type]} text-white px-4 py-3 rounded-xl shadow-2xl text-sm font-bold flex items-center justify-center text-center pointer-events-auto toast-enter`;
+            toast.innerText = message;
+            
+            container.appendChild(toast);
+            
+            // Trigger animation
+            setTimeout(() => toast.classList.add('toast-active'), 10);
+            
+            // Remove toast
+            setTimeout(() => {
+                toast.classList.replace('toast-active', 'toast-exit');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
         };
 
         const initAuth = async () => {
@@ -307,12 +342,14 @@
             backBtn.classList.remove('hidden');
             resumeContainer.classList.add('hidden');
             updateDisplay();
+            showToast("Match Resumed", "success");
         };
 
         window.toggleBreak = async function() {
             match.isOnBreak = !match.isOnBreak;
             updateDisplay();
             await syncToCloud();
+            showToast(match.isOnBreak ? "Break Started" : "Match Resumed", "info");
         };
 
         window.abandonMatch = async function() {
@@ -348,6 +385,7 @@
                     <p><strong>Final State:</strong> ${match.runs}/${match.wickets} in ${formatOvers(match.balls)} overs.</p>
                 `;
                 await syncToCloud();
+                showToast("Match Abandoned", "warning");
             }
         };
 
@@ -383,7 +421,10 @@
         window.startMatch = async function() {
             const bTeam = document.getElementById('batting-team').value;
             const boTeam = document.getElementById('bowling-team').value;
-            if(bTeam === boTeam) { alert("Teams must be different!"); return; }
+            if(bTeam === boTeam) { 
+                showToast("Teams must be different!", "error"); 
+                return; 
+            }
             match.battingTeam = bTeam; match.bowlingTeam = boTeam;
             match.maxOvers = parseInt(document.getElementById('max-overs').value);
             match.startTime = new Date().toISOString();
@@ -394,6 +435,7 @@
             resumeContainer.classList.add('hidden');
             await syncToCloud();
             updateDisplay();
+            showToast("Match Started", "success");
         };
 
         async function syncToCloud() {
@@ -454,7 +496,7 @@
         }
 
         function switchToSecondInnings() {
-            alert(`Innings over! ${match.battingTeam} scored ${match.runs}. Target: ${match.runs + 1}`);
+            showToast(`Innings Over! Target: ${match.runs + 1}`, "warning");
             const prevRuns = match.runs; const temp = match.battingTeam;
             match.battingTeam = match.bowlingTeam; match.bowlingTeam = temp;
             match.target = prevRuns + 1; match.runs = 0; match.wickets = 0; match.balls = 0;
@@ -491,6 +533,7 @@
                 <p><strong>Score:</strong> ${match.runs}/${match.wickets} (${formatOvers(match.balls)})</p>
             `;
             syncToCloud();
+            showToast("Match Finished", "success");
         }
 
         function updateDisplay() {
@@ -571,6 +614,7 @@
             match.runs = prevState.runs; match.wickets = prevState.wickets;
             match.balls = prevState.balls; match.overHistory = prevState.overHistory;
             updateDisplay(); await syncToCloud();
+            showToast("Action Undone", "info");
         };
 
         window.redoLast = async function() {
@@ -582,6 +626,7 @@
             match.runs = nextState.runs; match.wickets = nextState.wickets;
             match.balls = nextState.balls; match.overHistory = nextState.overHistory;
             updateDisplay(); await syncToCloud();
+            showToast("Action Restored", "info");
         };
 
         window.showHistory = function() {
@@ -635,7 +680,10 @@
             const matchRef = doc(db, 'artifacts', appId, 'public', 'data', 'matches', matchId);
             unsubscribeMatch = onSnapshot(matchRef, (docSnap) => {
                 if (docSnap.exists()) updateViewerUI(docSnap.data());
-                else { alert("Match ended."); stopWatching(); }
+                else { 
+                    showToast("Match data no longer exists.", "error"); 
+                    stopWatching(); 
+                }
             });
         };
 
