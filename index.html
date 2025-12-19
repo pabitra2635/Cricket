@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gully Cricket Live Scorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .ball-dot { @apply w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border; }
+        .bg-brand-primary { background-color: #F7631B; }
+        .text-brand-primary { color: #F7631B; }
+        .border-brand-primary { border-color: #F7631B; }
+        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #F7631B; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen font-sans">
+
+    <div id="app" class="max-w-md mx-auto bg-white min-h-screen shadow-lg flex flex-col relative">
+        
+        <!-- Header -->
+        <header class="bg-brand-primary text-white p-4 shadow-md sticky top-0 z-50">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <img src="https://mgcub.ac.in/images/rotate.png" alt="Logo" class="h-10 w-10 object-contain bg-white rounded-full p-1">
+                    <div>
+                        <h1 class="text-xl font-bold tracking-wider leading-tight">GULLY PREMIER LEAGUE</h1>
+                        <div class="flex items-center gap-2">
+                            <span id="sync-status" class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+                            <p class="text-[10px] text-orange-100 uppercase tracking-widest">Live Cloud Sync Active</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Setup Screen -->
+        <div id="setup-screen" class="p-6 flex-grow flex flex-col">
+            <div class="text-center mb-6">
+                <img src="https://mgcub.ac.in/images/rotate.png" alt="MGCUB Logo" class="mx-auto h-20 w-20 mb-2 object-contain">
+                <h2 class="text-lg font-semibold text-gray-700">Tournament Setup</h2>
+            </div>
+            
+            <div class="space-y-4 flex-grow">
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Batting Team</label>
+                    <select id="batting-team" class="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-[#F7631B] outline-none">
+                        <option value="B.Tech">B.Tech</option>
+                        <option value="MBA">MBA</option>
+                        <option value="B.Com">B.Com</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Bowling Team</label>
+                    <select id="bowling-team" class="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-[#F7631B] outline-none">
+                        <option value="MBA">MBA</option>
+                        <option value="B.Tech">B.Tech</option>
+                        <option value="B.Com">B.Com</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">Overs Per Innings</label>
+                    <input type="number" id="max-overs" value="5" class="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-[#F7631B] outline-none">
+                </div>
+
+                <button onclick="startMatch()" class="w-full bg-brand-primary hover:opacity-90 text-white font-bold py-4 rounded-xl shadow-lg transition-transform active:scale-95">
+                    START MATCH
+                </button>
+
+                <button onclick="showHistory()" class="w-full bg-gray-100 text-gray-600 font-bold py-3 rounded-xl border border-gray-300 transition-transform active:scale-95">
+                    VIEW MATCH HISTORY
+                </button>
+            </div>
+        </div>
+
+        <!-- History Screen -->
+        <div id="history-screen" class="hidden p-6 flex-grow overflow-y-auto">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-bold text-gray-800">Match History</h2>
+                <button onclick="hideHistory()" class="text-sm text-[#F7631B] font-bold">Back to Setup</button>
+            </div>
+            <div id="history-list" class="space-y-4">
+                <!-- Matches will be loaded here -->
+                <div class="text-center text-gray-500 py-10">Loading past matches...</div>
+            </div>
+        </div>
+
+        <!-- Scoring Screen -->
+        <div id="scoring-screen" class="hidden flex-grow flex flex-col">
+            <!-- Score Display -->
+            <div class="bg-gray-900 text-white p-6 text-center">
+                <div class="flex justify-between items-center mb-2">
+                    <span id="display-teams" class="text-sm font-medium text-gray-400 uppercase tracking-widest">Loading...</span>
+                    <span id="display-target" class="text-sm text-[#F7631B] font-bold hidden uppercase">TARGET: 0</span>
+                </div>
+                <div class="text-5xl font-black mb-1">
+                    <span id="runs">0</span>/<span id="wickets">0</span>
+                </div>
+                <div class="text-lg text-gray-400">
+                    Overs: <span id="overs">0.0</span> / <span id="limit">5</span>
+                </div>
+                <div class="mt-2 text-xs text-gray-500 flex justify-center gap-4">
+                    <span>CRR: <span id="crr">0.00</span></span>
+                    <span id="rrr-container" class="hidden">RRR: <span id="rrr">0.00</span></span>
+                </div>
+            </div>
+
+            <!-- Recent Balls -->
+            <div class="p-3 bg-gray-200 border-b flex items-center gap-2 overflow-x-auto">
+                <span class="text-[10px] font-bold text-gray-500 uppercase">This Over:</span>
+                <div id="over-history" class="flex gap-1"></div>
+            </div>
+
+            <!-- Control Panel -->
+            <div class="p-4 grid grid-cols-4 gap-3 bg-white flex-grow">
+                <button onclick="addScore(0)" class="col-span-1 bg-gray-100 hover:bg-gray-200 h-16 rounded-lg font-bold text-xl border-b-4 border-gray-300">0</button>
+                <button onclick="addScore(1)" class="col-span-1 bg-gray-100 hover:bg-gray-200 h-16 rounded-lg font-bold text-xl border-b-4 border-gray-300">1</button>
+                <button onclick="addScore(2)" class="col-span-1 bg-gray-100 hover:bg-gray-200 h-16 rounded-lg font-bold text-xl border-b-4 border-gray-300">2</button>
+                <button onclick="addScore(3)" class="col-span-1 bg-gray-100 hover:bg-gray-200 h-16 rounded-lg font-bold text-xl border-b-4 border-gray-300">3</button>
+                
+                <button onclick="addScore(4)" class="col-span-2 bg-orange-50 text-[#F7631B] border-b-4 border-orange-200 hover:bg-orange-100 h-16 rounded-lg font-black text-2xl">4</button>
+                <button onclick="addScore(6)" class="col-span-2 bg-[#F7631B] text-white hover:opacity-90 h-16 rounded-lg font-black text-2xl border-b-4 border-orange-800">6</button>
+
+                <button onclick="addExtra('WD')" class="col-span-2 bg-gray-50 text-gray-700 hover:bg-gray-100 h-16 rounded-lg font-bold border-b-4 border-gray-200 text-lg">WIDE (+1)</button>
+                <button onclick="addExtra('NB')" class="col-span-2 bg-gray-50 text-gray-700 hover:bg-gray-100 h-16 rounded-lg font-bold border-b-4 border-gray-200 text-lg">NO BALL (+1)</button>
+
+                <button onclick="addWicket()" class="col-span-4 bg-red-600 text-white hover:bg-red-700 h-16 rounded-lg font-black text-xl shadow-lg uppercase tracking-widest active:scale-95">WICKET!</button>
+            </div>
+
+            <!-- Footer -->
+            <div class="p-4 bg-gray-50 flex items-center gap-3">
+                <button onclick="undoLast()" class="flex-grow py-3 text-sm font-semibold text-gray-600 border rounded-lg bg-white hover:bg-gray-100 transition-colors shadow-sm">
+                    UNDO LAST ACTION
+                </button>
+                <div id="save-loader" class="hidden"><div class="loader"></div></div>
+            </div>
+        </header>
+        </div>
+
+        <!-- Result Screen -->
+        <div id="result-screen" class="hidden p-8 text-center flex-grow flex flex-col justify-center">
+            <div class="text-6xl mb-4">🏆</div>
+            <h2 class="text-2xl font-black text-gray-800 mb-2 uppercase">Match Finished!</h2>
+            <p id="winner-text" class="text-xl font-bold text-[#F7631B] mb-6"></p>
+            <div id="final-stats" class="bg-gray-100 p-4 rounded-lg mb-8 text-left space-y-2 text-sm"></div>
+            <button onclick="location.reload()" class="w-full bg-gray-800 text-white py-4 rounded-xl font-bold uppercase">New Match</button>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBFBAcdUrHyfWGZEjxi0d1JhGHskqBKD3I",
+            authDomain: "cricket-17e2d.firebaseapp.com",
+            databaseURL: "https://cricket-17e2d-default-rtdb.firebaseio.com",
+            projectId: "cricket-17e2d",
+            storageBucket: "cricket-17e2d.firebasestorage.app",
+            messagingSenderId: "346710609466",
+            appId: "1:346710609466:web:a7f4d214c999767474af03"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const appId = "cricket-mgcub-v1"; // Custom app ID for Rule 1
+
+        let user = null;
+        let currentMatchId = null;
+
+        let match = {
+            battingTeam: "", bowlingTeam: "", maxOvers: 5,
+            innings: 1, target: null, runs: 0, wickets: 0,
+            balls: 0, history: [], overHistory: [] 
+        };
+
+        // Initialize Auth
+        const initAuth = async () => {
+            try {
+                const cred = await signInAnonymously(auth);
+                user = cred.user;
+                console.log("Logged in anonymously as:", user.uid);
+            } catch (err) {
+                console.error("Auth failed", err);
+            }
+        };
+        initAuth();
+
+        // Screen Elements
+        const setupScreen = document.getElementById('setup-screen');
+        const scoringScreen = document.getElementById('scoring-screen');
+        const historyScreen = document.getElementById('history-screen');
+        const resultScreen = document.getElementById('result-screen');
+        const syncStatus = document.getElementById('sync-status');
+
+        window.startMatch = async function() {
+            const bTeam = document.getElementById('batting-team').value;
+            const boTeam = document.getElementById('bowling-team').value;
+            if(bTeam === boTeam) { alert("Teams must be different!"); return; }
+
+            match.battingTeam = bTeam;
+            match.bowlingTeam = boTeam;
+            match.maxOvers = parseInt(document.getElementById('max-overs').value);
+            
+            // Create a unique Match ID
+            currentMatchId = "match_" + Date.now();
+            
+            setupScreen.classList.add('hidden');
+            scoringScreen.classList.remove('hidden');
+            
+            await syncToCloud();
+            updateDisplay();
+        };
+
+        async function syncToCloud() {
+            if (!user || !currentMatchId) return;
+            document.getElementById('save-loader').classList.remove('hidden');
+            syncStatus.classList.replace('bg-green-400', 'bg-yellow-400');
+
+            try {
+                // Rule 1: Custom Path /artifacts/{appId}/public/data/{collection}
+                const matchRef = doc(db, 'artifacts', appId, 'public', 'data', 'matches', currentMatchId);
+                await setDoc(matchRef, {
+                    ...match,
+                    lastUpdated: serverTimestamp(),
+                    scorerId: user.uid,
+                    status: (resultScreen.classList.contains('hidden')) ? "Live" : "Finished"
+                });
+                syncStatus.classList.replace('bg-yellow-400', 'bg-green-400');
+            } catch (err) {
+                console.error("Sync Error", err);
+                syncStatus.classList.replace('bg-yellow-400', 'bg-red-500');
+            } finally {
+                document.getElementById('save-loader').classList.add('hidden');
+            }
+        }
+
+        window.addScore = async function(r) {
+            saveState();
+            match.runs += r;
+            match.balls++;
+            match.overHistory.push(r);
+            checkInningsStatus();
+            updateDisplay();
+            await syncToCloud();
+        };
+
+        window.addExtra = async function(type) {
+            saveState();
+            match.runs += 1;
+            match.overHistory.push(type);
+            updateDisplay();
+            await syncToCloud();
+        };
+
+        window.addWicket = async function() {
+            saveState();
+            match.wickets++;
+            match.balls++;
+            match.overHistory.push('W');
+            checkInningsStatus();
+            updateDisplay();
+            await syncToCloud();
+        };
+
+        function checkInningsStatus() {
+            const totalBalls = match.maxOvers * 6;
+            if (match.innings === 1) {
+                if (match.wickets >= 10 || match.balls >= totalBalls) switchToSecondInnings();
+            } else {
+                if (match.runs >= match.target) endMatch(match.battingTeam + " wins!");
+                else if (match.wickets >= 10 || match.balls >= totalBalls) {
+                    if (match.runs === match.target - 1) endMatch("It's a Draw!");
+                    else endMatch(match.bowlingTeam + " wins!");
+                }
+            }
+        }
+
+        function switchToSecondInnings() {
+            alert(`Innings over! ${match.battingTeam} scored ${match.runs}. Target: ${match.runs + 1}`);
+            const prevRuns = match.runs;
+            const temp = match.battingTeam;
+            match.battingTeam = match.bowlingTeam;
+            match.bowlingTeam = temp;
+            match.target = prevRuns + 1;
+            match.runs = 0; match.wickets = 0; match.balls = 0; match.innings = 2;
+            match.overHistory = []; match.history = [];
+            document.getElementById('display-target').classList.remove('hidden');
+            document.getElementById('rrr-container').classList.remove('hidden');
+        }
+
+        function endMatch(winner) {
+            scoringScreen.classList.add('hidden');
+            resultScreen.classList.remove('hidden');
+            document.getElementById('winner-text').innerText = winner;
+            document.getElementById('final-stats').innerHTML = `
+                <p><strong>Team Batting:</strong> ${match.battingTeam}</p>
+                <p><strong>Score:</strong> ${match.runs}/${match.wickets}</p>
+                <p><strong>Overs:</strong> ${formatOvers(match.balls)}</p>
+                <p><strong>Result:</strong> ${winner}</p>
+            `;
+            syncToCloud(); // Final sync
+        }
+
+        function updateDisplay() {
+            document.getElementById('display-teams').innerText = `${match.battingTeam} vs ${match.bowlingTeam}`;
+            document.getElementById('runs').innerText = match.runs;
+            document.getElementById('wickets').innerText = match.wickets;
+            document.getElementById('overs').innerText = formatOvers(match.balls);
+            document.getElementById('limit').innerText = match.maxOvers;
+            
+            if (match.target) {
+                document.getElementById('display-target').innerText = `TARGET: ${match.target}`;
+                const ballsLeft = (match.maxOvers * 6) - match.balls;
+                const runsNeeded = match.target - match.runs;
+                const rrr = ballsLeft > 0 ? (runsNeeded / (ballsLeft / 6)).toFixed(2) : "0.00";
+                document.getElementById('rrr').innerText = rrr;
+            }
+
+            const crr = match.balls > 0 ? (match.runs / (match.balls / 6)).toFixed(2) : "0.00";
+            document.getElementById('crr').innerText = crr;
+
+            const historyDiv = document.getElementById('over-history');
+            historyDiv.innerHTML = '';
+            
+            let currentOverBalls = [];
+            if (match.balls > 0 || match.overHistory.length > 0) {
+                const legalBallsToSkip = Math.floor((match.balls - 0.1) / 6) * 6;
+                let legalCount = 0;
+                let startIndex = 0;
+                for (let i = 0; i < match.overHistory.length; i++) {
+                    if (legalCount >= legalBallsToSkip) {
+                        startIndex = i;
+                        break;
+                    }
+                    if (match.overHistory[i] !== 'WD' && match.overHistory[i] !== 'NB') legalCount++;
+                }
+                currentOverBalls = match.overHistory.slice(startIndex);
+            }
+
+            currentOverBalls.forEach(ball => {
+                const span = document.createElement('span');
+                span.className = 'ball-dot ' + getBallColor(ball);
+                span.innerText = ball;
+                historyDiv.appendChild(span);
+            });
+        }
+
+        function getBallColor(val) {
+            if (val === 4) return 'bg-orange-100 text-[#F7631B] border-orange-300';
+            if (val === 6) return 'bg-[#F7631B] text-white border-orange-800';
+            if (val === 'W') return 'bg-red-500 text-white border-red-600';
+            if (val === 'WD' || val === 'NB') return 'bg-yellow-400 text-black border-yellow-500';
+            return 'bg-white text-gray-800 border-gray-300';
+        }
+
+        function formatOvers(balls) {
+            return `${Math.floor(balls / 6)}.${balls % 6}`;
+        }
+
+        function saveState() {
+            match.history.push(JSON.stringify({
+                runs: match.runs, wickets: match.wickets, balls: match.balls, overHistory: [...match.overHistory]
+            }));
+            if (match.history.length > 20) match.history.shift();
+        }
+
+        window.undoLast = async function() {
+            if (match.history.length === 0) return;
+            const prevState = JSON.parse(match.history.pop());
+            match.runs = prevState.runs; match.wickets = prevState.wickets;
+            match.balls = prevState.balls; match.overHistory = prevState.overHistory;
+            updateDisplay();
+            await syncToCloud();
+        };
+
+        // --- History Logic ---
+        window.showHistory = async function() {
+            setupScreen.classList.add('hidden');
+            historyScreen.classList.remove('hidden');
+            const list = document.getElementById('history-list');
+            list.innerHTML = '<div class="text-center py-10">Fetching matches...</div>';
+
+            try {
+                // Rule 2: Simple query, fetch all, then sort in memory
+                const q = collection(db, 'artifacts', appId, 'public', 'data', 'matches');
+                const querySnapshot = await getDocs(q);
+                let matches = [];
+                querySnapshot.forEach(doc => matches.push(doc.data()));
+                
+                // Sort by date manually
+                matches.sort((a, b) => (b.lastUpdated?.seconds || 0) - (a.lastUpdated?.seconds || 0));
+
+                if (matches.length === 0) {
+                    list.innerHTML = '<div class="text-center py-10 text-gray-400">No matches recorded yet.</div>';
+                    return;
+                }
+
+                list.innerHTML = matches.map(m => `
+                    <div class="bg-white border rounded-xl p-4 shadow-sm border-l-4 border-l-[#F7631B]">
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                ${m.lastUpdated ? new Date(m.lastUpdated.seconds * 1000).toLocaleDateString() : 'Just now'}
+                            </span>
+                            <span class="px-2 py-0.5 rounded-full text-[9px] font-bold ${m.status === 'Live' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}">
+                                ${m.status}
+                            </span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h3 class="font-bold text-gray-800">${m.battingTeam} vs ${m.bowlingTeam}</h3>
+                                <p class="text-xs text-gray-500">${m.maxOvers} Overs Match</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xl font-black text-gray-900">${m.runs}/${m.wickets}</p>
+                                <p class="text-[10px] text-gray-500">${Math.floor(m.balls/6)}.${m.balls%6} Overs</p>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                list.innerHTML = `<div class="text-red-500 text-center py-10">Error loading history: ${err.message}</div>`;
+            }
+        };
+
+        window.hideHistory = function() {
+            historyScreen.classList.add('hidden');
+            setupScreen.classList.remove('hidden');
+        };
+
+    </script>
+</body>
+</html>
