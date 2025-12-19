@@ -285,7 +285,8 @@
             innings: 1, target: null, runs: 0, wickets: 0,
             balls: 0, history: [], redoStack: [], overHistory: [],
             startTime: null, endTime: null, isOnBreak: false,
-            isAbandoned: false
+            isAbandoned: false,
+            result: null
         };
 
         // --- Toast System ---
@@ -426,7 +427,8 @@
                 startTime: activeMatchData.startTime || null,
                 endTime: activeMatchData.endTime || null,
                 isOnBreak: activeMatchData.isOnBreak || false,
-                isAbandoned: activeMatchData.isAbandoned || false
+                isAbandoned: activeMatchData.isAbandoned || false,
+                result: activeMatchData.result || null
             };
             setupScreen.classList.add('hidden');
             scoringScreen.classList.remove('hidden');
@@ -506,7 +508,8 @@
                 innings: 1, target: null, runs: 0, wickets: 0,
                 balls: 0, history: [], redoStack: [], overHistory: [],
                 startTime: null, endTime: null, isOnBreak: false,
-                isAbandoned: false
+                isAbandoned: false,
+                result: null
             };
         }
 
@@ -602,6 +605,7 @@
         }
 
         function endMatch(winner) {
+            match.result = winner;
             match.endTime = new Date().toISOString();
             match.isOnBreak = false;
             scoringScreen.classList.add('hidden'); resultScreen.classList.remove('hidden');
@@ -756,6 +760,7 @@
                     const eT = m.endTime ? new Date(m.endTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
                     let sCol = 'bg-gray-100 text-gray-600';
                     let btnText = "View Match Summary";
+                    let resultBadge = '';
                     
                     if (m.status === 'Live') {
                         sCol = 'bg-green-100 text-green-700 animate-pulse';
@@ -765,6 +770,9 @@
                         btnText = "View Live Score";
                     } else if (m.status === 'Abandoned') {
                         sCol = 'bg-red-50 text-red-400';
+                        resultBadge = `<div class="mt-3 mb-1 text-center font-bold text-sm text-red-500 bg-red-50 py-1 rounded-lg border border-red-100">⛔ Match Abandoned</div>`;
+                    } else if (m.status === 'Finished' && m.result) {
+                         resultBadge = `<div class="mt-3 mb-1 text-center font-bold text-sm text-[#F7631B] bg-orange-50 py-1 rounded-lg border border-orange-100">🏆 ${m.result}</div>`;
                     }
 
                     return `
@@ -783,7 +791,8 @@
                                     <p class="text-[10px] text-gray-500">${formatOvers(m.balls)} Overs</p>
                                 </div>
                             </div>
-                            <button onclick="startWatching('${m.id}')" class="w-full py-2 text-xs font-bold text-brand-primary border border-orange-100 bg-orange-50 rounded-lg uppercase tracking-tight">${btnText}</button>
+                            ${resultBadge}
+                            <button onclick="startWatching('${m.id}')" class="w-full py-2 text-xs font-bold text-brand-primary border border-orange-100 bg-orange-50 rounded-lg uppercase tracking-tight mt-1">${btnText}</button>
                         </div>
                     `;
                 };
@@ -831,16 +840,23 @@
             document.getElementById('v-overs').innerText = formatOvers(data.balls); document.getElementById('v-limit').innerText = data.maxOvers;
             
             const vB = document.getElementById('v-break-overlay');
-            if (data.status === "On Break" || data.status === "Abandoned") {
+            if (data.status === "On Break" || data.status === "Abandoned" || data.status === "Finished") {
                 vB.classList.remove('hidden');
                 if (data.status === "Abandoned") {
                     document.getElementById('v-overlay-icon').innerText = "☁️";
                     document.getElementById('v-overlay-title').innerText = "Abandoned";
                     document.getElementById('v-overlay-desc').innerText = "This match was called off.";
+                    document.getElementById('v-overlay-desc').className = "text-sm text-gray-300 mt-2";
+                } else if (data.status === "Finished") {
+                    document.getElementById('v-overlay-icon').innerText = "🏆";
+                    document.getElementById('v-overlay-title').innerText = "Match Finished";
+                    document.getElementById('v-overlay-desc').innerText = data.result || "See summary for details";
+                    document.getElementById('v-overlay-desc').className = "text-lg font-bold text-orange-200 mt-2";
                 } else {
                     document.getElementById('v-overlay-icon').innerText = "☕";
                     document.getElementById('v-overlay-title').innerText = "Break Time";
                     document.getElementById('v-overlay-desc').innerText = "Play is currently paused.";
+                    document.getElementById('v-overlay-desc').className = "text-sm text-gray-300 mt-2";
                 }
             } else vB.classList.add('hidden');
 
