@@ -318,15 +318,41 @@
                 const matches = [];
                 querySnapshot.forEach(doc => matches.push({id: doc.id, ...doc.data()}));
                 const active = matches.find(m => m.scorerId === user.uid && m.status !== "Finished" && m.status !== "Abandoned");
+                
                 if (active) {
-                    activeMatchData = active;
-                    resumeInfo.innerText = `${active.battingTeam} vs ${active.bowlingTeam}`;
-                    resumeContainer.classList.remove('hidden');
+                    // Check for timeout (15 mins)
+                    let lastActiveTime = new Date();
+                    if (active.lastUpdated && active.lastUpdated.toDate) {
+                        lastActiveTime = active.lastUpdated.toDate();
+                    } else if (active.lastUpdated && active.lastUpdated.seconds) {
+                        lastActiveTime = new Date(active.lastUpdated.seconds * 1000);
+                    } else if (active.startTime) {
+                        lastActiveTime = new Date(active.startTime);
+                    }
+
+                    const diffMinutes = (new Date() - lastActiveTime) / 1000 / 60;
+
+                    if (diffMinutes > 15) {
+                        // Auto Abandon
+                        const matchRef = doc(db, 'artifacts', appId, 'public', 'data', 'matches', active.id);
+                        await setDoc(matchRef, { 
+                            ...active, 
+                            status: "Abandoned", 
+                            isAbandoned: true,
+                            endTime: new Date().toISOString()
+                        });
+                        showToast("Previous match abandoned due to inactivity (>15m)", "warning");
+                        resumeContainer.classList.add('hidden');
+                    } else {
+                        activeMatchData = active;
+                        resumeInfo.innerText = `${active.battingTeam} vs ${active.bowlingTeam}`;
+                        resumeContainer.classList.remove('hidden');
+                    }
                 } else {
                     resumeContainer.classList.add('hidden');
                 }
             } catch (err) { 
-                console.warn("Match recovery silent failure"); 
+                console.warn("Match recovery silent failure", err); 
             }
         }
 
