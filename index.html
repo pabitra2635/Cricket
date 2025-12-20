@@ -27,6 +27,12 @@
         /* Modal Animation */
         .modal-enter { opacity: 0; transform: scale(0.95); }
         .modal-active { opacity: 1; transform: scale(1); transition: all 0.2s ease-out; }
+
+        /* 3D Coin Animation */
+        .perspective-1000 { perspective: 1000px; }
+        .transform-style-3d { transform-style: preserve-3d; }
+        .backface-hidden { backface-visibility: hidden; }
+        .rotate-y-180 { transform: rotateY(180deg); }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen font-sans text-gray-900">
@@ -97,6 +103,12 @@
                     <input type="text" id="bowling-team-input" class="hidden w-full p-3 mt-2 border rounded-lg bg-white focus:ring-2 focus:ring-[#F7631B] outline-none font-semibold shadow-sm" placeholder="Enter Team Name">
                 </div>
 
+                <div class="flex justify-end -mt-2">
+                    <button onclick="openTossModal()" class="text-xs font-bold text-[#F7631B] flex items-center gap-1 border border-orange-200 px-3 py-1.5 rounded-full hover:bg-orange-50 transition-colors shadow-sm">
+                        <span>🪙</span> Digital Toss
+                    </button>
+                </div>
+
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-600 mb-1 font-bold">Overs</label>
@@ -120,6 +132,48 @@
                         </span>
                         View Live Scores & History
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toss Modal -->
+        <div id="toss-modal" class="hidden fixed inset-0 z-[90] flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onclick="closeTossModal()"></div>
+            <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center overflow-hidden modal-enter">
+                <button onclick="closeTossModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+                <h3 class="text-xl font-black text-gray-800 uppercase tracking-tight mb-6">Coin Toss</h3>
+                
+                <!-- Coin Container -->
+                <div class="h-32 mb-8 flex justify-center perspective-1000">
+                     <div id="coin" class="w-32 h-32 relative transform-style-3d transition-transform duration-[3000ms]">
+                        <div class="absolute inset-0 rounded-full bg-yellow-400 border-4 border-yellow-600 flex items-center justify-center text-3xl font-bold text-yellow-800 shadow-inner backface-hidden">H</div>
+                        <div class="absolute inset-0 rounded-full bg-gray-200 border-4 border-gray-400 flex items-center justify-center text-3xl font-bold text-gray-700 shadow-inner backface-hidden rotate-y-180">T</div>
+                     </div>
+                </div>
+
+                <!-- Step 1: Flip -->
+                <div id="toss-controls">
+                    <button onclick="flipCoin()" class="w-full bg-brand-primary text-white font-bold py-3 rounded-xl shadow-lg uppercase tracking-widest hover:opacity-90">Flip Coin</button>
+                </div>
+                
+                <!-- Step 2: Winner -->
+                <div id="toss-winner-select" class="hidden space-y-3">
+                    <p class="text-sm text-gray-500 font-bold uppercase">Who won the toss?</p>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button id="btn-toss-team1" onclick="selectTossWinner(0)" class="p-2 border-2 border-gray-200 rounded-lg font-bold text-sm truncate hover:border-orange-400 transition-colors"></button>
+                        <button id="btn-toss-team2" onclick="selectTossWinner(1)" class="p-2 border-2 border-gray-200 rounded-lg font-bold text-sm truncate hover:border-orange-400 transition-colors"></button>
+                    </div>
+                </div>
+
+                <!-- Step 3: Decision -->
+                <div id="toss-decision-select" class="hidden space-y-3 mt-4">
+                    <p class="text-sm text-gray-500 font-bold uppercase">What did they choose?</p>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="finalizeToss('bat')" class="p-3 bg-blue-50 text-blue-600 border border-blue-200 rounded-xl font-bold text-sm hover:bg-blue-100 transition-colors">🏏 Bat</button>
+                        <button onclick="finalizeToss('bowl')" class="p-3 bg-green-50 text-green-600 border border-green-200 rounded-xl font-bold text-sm hover:bg-green-100 transition-colors">⚾ Bowl</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -325,6 +379,8 @@
         let unsubscribeMatch = null;
         let unsubscribeHistory = null; 
         let activeMatchData = null; 
+        let tossWinnerIdx = null; // 0 for team 1, 1 for team 2
+        let team1Name = "", team2Name = "";
 
         let match = {
             battingTeam: "", bowlingTeam: "", maxOvers: 5, playerCount: 11,
@@ -500,6 +556,129 @@
         const resumeContainer = document.getElementById('resume-container');
         const resumeInfo = document.getElementById('resume-match-info');
         const breakOverlay = document.getElementById('break-overlay');
+
+        // Toss Variables & Functions
+        const tossModal = document.getElementById('toss-modal');
+        const coin = document.getElementById('coin');
+        const tossControls = document.getElementById('toss-controls');
+        const tossWinnerSelect = document.getElementById('toss-winner-select');
+        const tossDecisionSelect = document.getElementById('toss-decision-select');
+
+        // Get helper
+        window.getTeamName = function(type) {
+            const select = document.getElementById(`${type}-team-select`);
+            if(select.value === 'custom') return document.getElementById(`${type}-team-input`).value.trim();
+            return select.value;
+        };
+
+        window.setTeamName = function(type, name) {
+            const select = document.getElementById(`${type}-team-select`);
+            const input = document.getElementById(`${type}-team-input`);
+            
+            // Check if name is in options
+            let found = false;
+            for(let i=0; i<select.options.length; i++) {
+                if(select.options[i].value === name) {
+                    select.value = name;
+                    found = true;
+                    break;
+                }
+            }
+            if(!found) {
+                select.value = 'custom';
+                input.value = name;
+                input.classList.remove('hidden');
+            } else {
+                input.classList.add('hidden');
+            }
+        };
+
+        window.openTossModal = function() {
+            team1Name = getTeamName('batting');
+            team2Name = getTeamName('bowling');
+
+            if(!team1Name || !team2Name) {
+                showToast("Please enter both team names first", "error");
+                return;
+            }
+            if(team1Name === team2Name) {
+                showToast("Teams must have different names", "error");
+                return;
+            }
+
+            document.getElementById('btn-toss-team1').innerText = team1Name;
+            document.getElementById('btn-toss-team2').innerText = team2Name;
+
+            // Reset Modal State
+            coin.style.transform = 'rotateY(0deg)';
+            tossControls.classList.remove('hidden');
+            tossWinnerSelect.classList.add('hidden');
+            tossDecisionSelect.classList.add('hidden');
+            
+            tossModal.classList.remove('hidden');
+            tossModal.querySelector('.relative').classList.remove('modal-active');
+            tossModal.querySelector('.relative').classList.add('modal-enter');
+            setTimeout(() => {
+                tossModal.querySelector('.relative').classList.remove('modal-enter');
+                tossModal.querySelector('.relative').classList.add('modal-active');
+            }, 10);
+        };
+
+        window.closeTossModal = function() {
+            tossModal.classList.add('hidden');
+        };
+
+        window.flipCoin = function() {
+            tossControls.classList.add('hidden');
+            const result = Math.random() < 0.5 ? 0 : 1; // 0 = Heads, 1 = Tails
+            // 5 spins + result
+            const rotate = 1800 + (result * 180); 
+            coin.style.transform = `rotateY(${rotate}deg)`;
+            
+            setTimeout(() => {
+                showToast(result === 0 ? "It's HEADS!" : "It's TAILS!", "info");
+                tossWinnerSelect.classList.remove('hidden');
+            }, 3000);
+        };
+
+        window.selectTossWinner = function(idx) {
+            tossWinnerIdx = idx;
+            const btn1 = document.getElementById('btn-toss-team1');
+            const btn2 = document.getElementById('btn-toss-team2');
+            
+            // Highlight selection
+            if(idx === 0) {
+                btn1.classList.add('bg-orange-100', 'border-brand-primary', 'text-brand-primary');
+                btn2.classList.remove('bg-orange-100', 'border-brand-primary', 'text-brand-primary');
+            } else {
+                btn2.classList.add('bg-orange-100', 'border-brand-primary', 'text-brand-primary');
+                btn1.classList.remove('bg-orange-100', 'border-brand-primary', 'text-brand-primary');
+            }
+            tossDecisionSelect.classList.remove('hidden');
+        };
+
+        window.finalizeToss = function(choice) {
+            const winnerName = tossWinnerIdx === 0 ? team1Name : team2Name;
+            const loserName = tossWinnerIdx === 0 ? team2Name : team1Name;
+            
+            let finalBatting = "", finalBowling = "";
+            
+            if(choice === 'bat') {
+                finalBatting = winnerName;
+                finalBowling = loserName;
+                showToast(`${winnerName} won toss & elected to BAT`, "success");
+            } else {
+                finalBatting = loserName;
+                finalBowling = winnerName;
+                showToast(`${winnerName} won toss & elected to BOWL`, "success");
+            }
+
+            // Update inputs
+            setTeamName('batting', finalBatting);
+            setTeamName('bowling', finalBowling);
+            
+            closeTossModal();
+        };
 
         async function checkForActiveMatch() {
             if (!user) return;
