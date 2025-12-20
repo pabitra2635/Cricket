@@ -152,7 +152,7 @@
                     </div>
                     <div>
                         <label class="text-[10px] font-bold text-gray-500 uppercase">Opening Bowler</label>
-                        <input type="text" id="init-bowler" class="w-full p-3 border rounded-lg bg-gray-50 font-bold focus:ring-2 focus:ring-[#F7631B] outline-none" placeholder="Bowler Name">
+                        <input type="text" id="init-bowler" class="w-full p-3 border rounded-lg bg-gray-50 font-bold focus:ring-2 focus:ring-[#F7631B] outline-none" placeholder="Bowler 1">
                     </div>
                 </div>
                 <button onclick="submitInitialPlayers()" class="w-full mt-6 bg-brand-primary text-white font-bold py-3 rounded-xl shadow-lg uppercase tracking-widest">Start Scoring</button>
@@ -168,7 +168,7 @@
                     <h3 class="text-lg font-black text-gray-800 uppercase">Wicket Fall!</h3>
                     <p class="text-sm text-gray-500">Who is the new batsman?</p>
                 </div>
-                <input type="text" id="new-batsman-name" class="w-full p-3 border rounded-lg bg-gray-50 font-bold focus:ring-2 focus:ring-[#F7631B] outline-none mb-4" placeholder="Enter Name">
+                <input type="text" id="new-batsman-name" class="w-full p-3 border rounded-lg bg-gray-50 font-bold focus:ring-2 focus:ring-[#F7631B] outline-none mb-4" placeholder="Enter Name (or leave blank)">
                 <button onclick="submitNewBatsman()" class="w-full bg-brand-primary text-white font-bold py-3 rounded-xl shadow-lg uppercase tracking-widest">Update Striker</button>
             </div>
         </div>
@@ -193,7 +193,7 @@
                     <div class="text-center text-xs font-bold text-gray-400">- OR -</div>
                     <div>
                         <label class="text-[10px] font-bold text-gray-500 uppercase">New Bowler</label>
-                        <input type="text" id="new-bowler-name" class="w-full p-3 border rounded-lg bg-gray-50 font-bold focus:ring-2 focus:ring-[#F7631B] outline-none" placeholder="Enter Name" oninput="document.getElementById('existing-bowler-select').value = ''">
+                        <input type="text" id="new-bowler-name" class="w-full p-3 border rounded-lg bg-gray-50 font-bold focus:ring-2 focus:ring-[#F7631B] outline-none" placeholder="Enter Name (or leave blank)" oninput="document.getElementById('existing-bowler-select').value = ''">
                     </div>
                 </div>
 
@@ -610,14 +610,13 @@
         };
 
         window.submitInitialPlayers = async function() {
-            const striker = document.getElementById('init-striker').value.trim();
-            const nonStriker = document.getElementById('init-non-striker').value.trim();
-            const bowler = document.getElementById('init-bowler').value.trim();
+            let striker = document.getElementById('init-striker').value.trim();
+            let nonStriker = document.getElementById('init-non-striker').value.trim();
+            let bowler = document.getElementById('init-bowler').value.trim();
 
-            if(!striker || !nonStriker || !bowler) {
-                showToast("Please fill all player names", "error");
-                return;
-            }
+            if(!striker) striker = "Batsman 1";
+            if(!nonStriker) nonStriker = "Batsman 2";
+            if(!bowler) bowler = "Bowler 1";
 
             match.striker = striker;
             match.nonStriker = nonStriker;
@@ -635,10 +634,12 @@
         };
 
         window.submitNewBatsman = async function() {
-            const name = document.getElementById('new-batsman-name').value.trim();
+            let name = document.getElementById('new-batsman-name').value.trim();
             if(!name) {
-                showToast("Please enter new batsman name", "error");
-                return;
+                // Wicket 1 down = 2 batsmen were on crease (1 & 2). New one is 3.
+                // Wicket count is updated BEFORE this modal.
+                // If 1 wicket, Batsman 3. If 2 wickets, Batsman 4.
+                name = `Batsman ${match.wickets + 2}`;
             }
             match.striker = name; // Assuming incoming batsman takes strike
             document.getElementById('new-batsman-modal').classList.add('hidden');
@@ -649,7 +650,7 @@
 
         window.submitNextBowler = async function() {
             const existing = document.getElementById('existing-bowler-select').value;
-            const newName = document.getElementById('new-bowler-name').value.trim();
+            let newName = document.getElementById('new-bowler-name').value.trim();
             
             let finalBowler = "";
             if(newName) {
@@ -658,8 +659,8 @@
             } else if (existing) {
                 finalBowler = existing;
             } else {
-                showToast("Select or Enter a Bowler", "error");
-                return;
+                finalBowler = `Bowler ${match.bowlersList.length + 1}`;
+                match.bowlersList.push(finalBowler);
             }
 
             match.bowler = finalBowler;
@@ -1233,6 +1234,14 @@
         };
 
         function handleEndOfOver() {
+            // Guard clause to prevent popup if innings/match is over
+            const totalBalls = match.maxOvers * 6;
+            const maxWickets = match.playerCount - 1;
+            const isInningsOver = match.balls >= totalBalls || match.wickets >= maxWickets;
+            const isMatchWon = match.innings === 2 && match.target && match.runs >= match.target;
+
+            if (isInningsOver || isMatchWon) return;
+
             // Rotate Strike at end of over
             const temp = match.striker;
             match.striker = match.nonStriker;
