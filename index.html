@@ -203,11 +203,11 @@
                 <!-- Updated Run Rate Display -->
                 <div class="mt-4 flex justify-around text-xs border-t border-gray-800 pt-4">
                     <div class="text-center">
-                        <p class="text-gray-500 uppercase font-bold">CRR</p>
+                        <p class="text-gray-500 uppercase font-bold">Run Rate</p>
                         <p class="text-lg font-bold" id="crr">0.00</p>
                     </div>
                     <div id="rrr-container" class="text-center hidden">
-                        <p class="text-gray-500 uppercase font-bold">RRR</p>
+                        <p class="text-gray-500 uppercase font-bold">Req Rate</p>
                         <p class="text-lg font-bold text-[#F7631B]" id="rrr">0.00</p>
                     </div>
                 </div>
@@ -257,7 +257,15 @@
             <div id="result-emoji" class="text-6xl mb-4">🏆</div>
             <h2 id="result-header" class="text-2xl font-black text-gray-800 mb-2 uppercase">Match Finished!</h2>
             <p id="winner-text" class="text-xl font-bold text-[#F7631B] mb-6"></p>
-            <div id="final-stats" class="bg-gray-100 p-4 rounded-lg mb-8 text-left space-y-2 text-sm"></div>
+            <div id="final-stats" class="bg-gray-100 p-4 rounded-lg mb-4 text-left space-y-2 text-sm"></div>
+            
+            <button onclick="shareCurrentMatch()" class="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-bold uppercase shadow-lg transition-transform active:scale-95 mb-3 flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+                Share Result
+            </button>
+            
             <button onclick="location.reload()" class="w-full bg-brand-primary text-white py-4 rounded-xl font-bold uppercase shadow-lg transition-transform active:scale-95">New Match</button>
         </div>
 
@@ -384,6 +392,9 @@
             } else if (!document.getElementById('scoring-screen').classList.contains('hidden')) {
                 idToShare = currentMatchId;
                 data = match;
+            } else if (!document.getElementById('result-screen').classList.contains('hidden')) {
+                idToShare = currentMatchId;
+                data = match;
             }
 
             if (!idToShare || !data) {
@@ -399,8 +410,12 @@
             // Construct Status Message
             const overs = Math.floor(data.balls / 6) + "." + (data.balls % 6);
             let statusMsg = "Live";
+            let actionText = "Watch Live Scoring:";
             
-            if (data.result) statusMsg = data.result;
+            if (data.result) {
+                statusMsg = "Result: " + data.result;
+                actionText = "See Match Summary:";
+            }
             else if (data.isAbandoned) statusMsg = "Abandoned";
             else if (data.isOnBreak) statusMsg = "Break";
             else if (data.target) {
@@ -409,8 +424,8 @@
                 statusMsg = `Target ${data.target} | Need ${runsNeeded} off ${ballsLeft} balls`;
             }
 
-            const title = "Gully Premier League Live Score";
-            const text = `🏏 ${data.battingTeam} vs ${data.bowlingTeam} ⚾\nScore: ${data.runs}/${data.wickets} (${overs} Overs)\nStatus: ${statusMsg}\n\nWatch Live Scoring:`;
+            const title = data.result ? "Match Result" : "Live Cricket Score";
+            const text = `🏏 ${data.battingTeam} vs ${data.bowlingTeam} ⚾\nScore: ${data.runs}/${data.wickets} (${overs} Overs)\n${statusMsg}\n\n${actionText}`;
 
             // Native Share with Fallback
             if (navigator.share) {
