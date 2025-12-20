@@ -188,9 +188,17 @@
                 <div id="start-time-label" class="text-[10px] text-gray-500 mb-2 uppercase tracking-widest font-medium">Started: --:--</div>
                 <div class="text-5xl font-black mb-1"><span id="runs">0</span>/<span id="wickets">0</span></div>
                 <div class="text-lg text-gray-400 font-bold">Overs: <span id="overs">0.0</span> / <span id="limit">5</span></div>
-                <div class="mt-2 text-xs text-gray-500 flex justify-center gap-4 font-bold">
-                    <span>CRR: <span id="crr">0.00</span></span>
-                    <span id="rrr-container" class="hidden">RRR: <span id="rrr">0.00</span></span>
+                
+                <!-- Updated Run Rate Display -->
+                <div class="mt-4 flex justify-around text-xs border-t border-gray-800 pt-4">
+                    <div class="text-center">
+                        <p class="text-gray-500 uppercase font-bold">Run Rate</p>
+                        <p class="text-lg font-bold" id="crr">0.00</p>
+                    </div>
+                    <div id="rrr-container" class="text-center hidden">
+                        <p class="text-gray-500 uppercase font-bold">Req Rate</p>
+                        <p class="text-lg font-bold text-[#F7631B]" id="rrr">0.00</p>
+                    </div>
                 </div>
             </div>
 
