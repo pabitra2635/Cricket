@@ -941,13 +941,16 @@
                         lastActiveTime = active.lastUpdated.toDate();
                     } else if (active.lastUpdated && active.lastUpdated.seconds) {
                         lastActiveTime = new Date(active.lastUpdated.seconds * 1000);
+                    } else if (typeof active.lastUpdated === 'string') {
+                        lastActiveTime = new Date(active.lastUpdated);
                     } else if (active.startTime) {
                         lastActiveTime = new Date(active.startTime);
                     }
 
                     const diffMinutes = (new Date() - lastActiveTime) / 1000 / 60;
 
-                    if (active.status === "Live" && diffMinutes > 20) {
+                    // Updated Logic: Check for Live OR On Break, and diff > 30 mins
+                    if ((active.status === "Live" || active.status === "On Break") && diffMinutes > 30) {
                         const matchRef = doc(db, 'artifacts', appId, 'public', 'data', 'matches', active.id);
                         await setDoc(matchRef, { 
                             ...active, 
@@ -957,7 +960,7 @@
                             lastUpdated: serverTimestamp()
                         }, { merge: true });
 
-                        showToast("Match abandoned due to 20m inactivity (No score update)", "warning");
+                        showToast("Match abandoned due to 30m inactivity", "warning");
                         
                         // If scorer is currently in the match screen, kick them out
                         if (currentMatchId === active.id) {
@@ -1046,7 +1049,7 @@
                 document.getElementById('final-stats').innerHTML = `
                     <div class="grid grid-cols-2 gap-2 mb-4">
                         <div class="bg-gray-50 p-2 rounded">
-                            <p class="text-[10px] uppercase text-gray-400 font-bold">Started</p>
+                            <p class="text-[10px] uppercase text-gray-400 font-bold">Start</p>
                             <p class="text-sm font-bold text-gray-700">${sTime}</p>
                         </div>
                         <div class="bg-gray-50 p-2 rounded">
