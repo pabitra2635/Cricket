@@ -5,8 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gully Cricket Live Scorer</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .ball-dot { @apply w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border; }
+    <style type="text/tailwindcss">
+        /* Updated Ball Design */
+        .ball-dot { 
+            @apply min-w-[36px] h-9 rounded-lg flex items-center justify-center text-sm font-black border shadow-sm transition-all transform hover:-translate-y-0.5; 
+        }
+        
         .bg-brand-primary { background-color: #F7631B; }
         .text-brand-primary { color: #F7631B; }
         .border-brand-primary { border-color: #F7631B; }
@@ -162,10 +166,12 @@
                 <p id="v-overlay-desc" class="text-sm text-gray-300 mt-2">Waiting for teams to resume play...</p>
             </div>
 
-            <div class="p-4 bg-gray-50 border-b flex flex-col gap-2">
-                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Current Over History</span>
-                <div id="v-over-history" class="flex gap-1 overflow-x-auto py-1"></div>
+            <!-- Viewer Over History -->
+            <div class="p-4 bg-white border-b flex items-center gap-3 overflow-x-auto shadow-sm">
+                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest shrink-0">This Over</span>
+                <div id="v-over-history" class="flex gap-2 pb-1"></div>
             </div>
+
             <div class="p-10 flex-grow flex flex-col items-center justify-center text-center space-y-4">
                 <div class="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center"><span class="w-3 h-3 bg-green-500 rounded-full animate-ping"></span></div>
                 <p class="text-gray-500 font-medium">Watching Live Updates...</p>
@@ -220,10 +226,12 @@
                 </div>
             </div>
 
-            <div class="p-3 bg-gray-200 border-b flex items-center gap-2 overflow-x-auto">
-                <span class="text-[10px] font-bold text-gray-500 uppercase tracking-tight">This Over:</span>
-                <div id="over-history" class="flex gap-1"></div>
+            <!-- Scoring Over History -->
+            <div class="p-4 bg-white border-b flex items-center gap-3 overflow-x-auto shadow-sm">
+                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest shrink-0">This Over</span>
+                <div id="over-history" class="flex gap-2 pb-1"></div>
             </div>
+
             <div class="p-4 grid grid-cols-4 gap-3 bg-white flex-grow">
                 <button onclick="addScore(0)" class="col-span-1 bg-gray-100 hover:bg-gray-200 h-16 rounded-lg font-bold text-xl border-b-4 border-gray-300">0</button>
                 <button onclick="addScore(1)" class="col-span-1 bg-gray-100 hover:bg-gray-200 h-16 rounded-lg font-bold text-xl border-b-4 border-gray-300">1</button>
@@ -812,10 +820,14 @@
         }
 
         function getBallColor(val) {
-            if (val === 4) return 'bg-orange-100 text-[#F7631B] border-orange-300';
-            if (val === 6) return 'bg-[#F7631B] text-white border-orange-800';
-            if (val === 'W') return 'bg-red-500 text-white border-red-600';
-            if (val === 'WD' || val === 'NB') return 'bg-yellow-400 text-black border-yellow-500';
+            if (val === 0) return 'bg-gray-50 text-gray-400 border-gray-200';
+            if (val === 1) return 'bg-white text-gray-600 border-gray-200';
+            if (val === 2) return 'bg-white text-gray-700 border-gray-300';
+            if (val === 3) return 'bg-white text-gray-800 border-gray-400';
+            if (val === 4) return 'bg-blue-500 text-white border-blue-600 shadow-sm';
+            if (val === 6) return 'bg-[#F7631B] text-white border-orange-600 shadow-sm';
+            if (val === 'W') return 'bg-red-500 text-white border-red-600 shadow-sm';
+            if (val === 'WD' || val === 'NB') return 'bg-yellow-100 text-yellow-800 border-yellow-300';
             return 'bg-white text-gray-800 border-gray-300';
         }
 
