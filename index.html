@@ -52,7 +52,6 @@
         <!-- Setup Screen -->
         <div id="setup-screen" class="p-6 flex-grow flex flex-col">
             <div class="text-center mb-6">
-                <!-- UPDATED IMAGE HERE -->
                 <img src="https://c8.alamy.com/comp/2C0RN9G/cricket-bat-and-ball-badge-illustration-2C0RN9G.jpg" alt="Cricket Badge" class="mx-auto h-24 w-24 mb-2 object-contain rounded-full shadow-sm">
                 <h2 class="text-lg font-semibold text-gray-700">Tournament Setup</h2>
             </div>
@@ -148,7 +147,6 @@
                 </div>
             </div>
 
-            <!-- Viewer Break/Abandon Overlay -->
             <div id="v-break-overlay" class="hidden absolute inset-0 z-10 break-overlay flex flex-col items-center justify-center text-white text-center p-6">
                 <div id="v-overlay-icon" class="text-4xl mb-4">☕</div>
                 <h3 id="v-overlay-title" class="text-2xl font-black uppercase tracking-tighter">Match on Break</h3>
@@ -182,7 +180,6 @@
                 </div>
             </div>
 
-            <!-- Scorer Break Overlay -->
             <div id="break-overlay" class="hidden absolute inset-0 z-20 break-overlay flex flex-col items-center justify-center text-white text-center p-6">
                 <div class="text-5xl mb-4">⏸️</div>
                 <h3 class="text-2xl font-black uppercase tracking-tighter">Match Paused</h3>
@@ -305,7 +302,6 @@
             toast.innerText = message;
             
             container.appendChild(toast);
-            
             setTimeout(() => toast.classList.add('toast-active'), 10);
             
             setTimeout(() => {
@@ -339,12 +335,14 @@
             if(confirmResolve) confirmResolve(false);
         };
 
-
         const initAuth = async () => {
             try {
                 const cred = await signInAnonymously(auth);
                 user = cred.user;
+                // Initial check
                 checkForActiveMatch();
+                // Set background checker every minute
+                setInterval(checkForActiveMatch, 60000);
             } catch (err) { 
                 showToast("Auth Failed: " + err.message, "error"); 
             }
@@ -369,12 +367,14 @@
                 const querySnapshot = await getDocs(q);
                 const matches = [];
                 querySnapshot.forEach(doc => matches.push({id: doc.id, ...doc.data()}));
+                
+                // We only care about matches current user is scoring that aren't finished
                 const active = matches.find(m => m.scorerId === user.uid && m.status !== "Finished" && m.status !== "Abandoned");
                 
                 if (active) {
-                    // Check for timeout (15 mins)
                     let lastActiveTime = new Date();
-                    if (active.lastUpdated && active.lastUpdated.toDate) {
+                    // Firebase timestamp handling logic
+                    if (active.lastUpdated && typeof active.lastUpdated.toDate === 'function') {
                         lastActiveTime = active.lastUpdated.toDate();
                     } else if (active.lastUpdated && active.lastUpdated.seconds) {
                         lastActiveTime = new Date(active.lastUpdated.seconds * 1000);
@@ -384,21 +384,33 @@
 
                     const diffMinutes = (new Date() - lastActiveTime) / 1000 / 60;
 
+                    // If more than 15 minutes of inactivity
                     if (diffMinutes > 15) {
-                        // Auto Abandon
                         const matchRef = doc(db, 'artifacts', appId, 'public', 'data', 'matches', active.id);
                         await setDoc(matchRef, { 
                             ...active, 
                             status: "Abandoned", 
                             isAbandoned: true,
-                            endTime: new Date().toISOString()
-                        });
-                        showToast("Previous match abandoned due to inactivity (>15m)", "warning");
+                            endTime: new Date().toISOString(),
+                            lastUpdated: serverTimestamp()
+                        }, { merge: true });
+
+                        showToast("A previous match was abandoned due to inactivity (>15m)", "warning");
+                        
+                        // If user was currently in that match scoring, kick them out
+                        if (currentMatchId === active.id) {
+                            location.reload(); 
+                        }
+                        
+                        activeMatchData = null;
                         resumeContainer.classList.add('hidden');
                     } else {
                         activeMatchData = active;
                         resumeInfo.innerText = `🏏 ${active.battingTeam} vs ⚾ ${active.bowlingTeam}`;
-                        resumeContainer.classList.remove('hidden');
+                        // Only show resume button if we are on the setup screen
+                        if (!setupScreen.classList.contains('hidden')) {
+                            resumeContainer.classList.remove('hidden');
+                        }
                     }
                 } else {
                     resumeContainer.classList.add('hidden');
@@ -581,7 +593,7 @@
 
         function checkInningsStatus() {
             const totalBalls = match.maxOvers * 6;
-            const maxWickets = match.playerCount - 1; // standard rule: last man stands usually not allowed in GPL
+            const maxWickets = match.playerCount - 1; 
             
             if (match.innings === 1) {
                 if (match.wickets >= maxWickets || match.balls >= totalBalls) switchToSecondInnings();
@@ -740,7 +752,6 @@
                 let matches = [];
                 querySnapshot.forEach(doc => matches.push({id: doc.id, ...doc.data()}));
                 
-                // Sort by Start Time (Newest First)
                 matches.sort((a, b) => {
                     const timeA = a.startTime ? new Date(a.startTime).getTime() : 0;
                     const timeB = b.startTime ? new Date(b.startTime).getTime() : 0;
