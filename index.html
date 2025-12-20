@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gully Cricket Live Scorer</title>
-    <link rel="icon" href="	https://mgcub.ac.in/images/rotate.png" type="image/png">
+    <link rel="icon" href="https://mgcub.ac.in/images/rotate.png" type="image/png">
     <script src="https://cdn.tailwindcss.com"></script>
     <style type="text/tailwindcss">
         /* Updated Ball Design */
@@ -77,20 +77,24 @@
 
                 <div>
                     <label class="block text-sm font-medium text-gray-600 mb-1 font-bold">🏏 Batting Team</label>
-                    <select id="batting-team" class="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-[#F7631B] outline-none font-semibold">
+                    <select id="batting-team-select" onchange="toggleCustomTeam('batting')" class="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-[#F7631B] outline-none font-semibold">
                         <option value="B.Tech">B.Tech</option>
                         <option value="MBA">MBA</option>
                         <option value="B.Com">B.Com</option>
+                        <option value="custom" class="text-brand-primary font-bold">+ Custom Team Name</option>
                     </select>
+                    <input type="text" id="batting-team-input" class="hidden w-full p-3 mt-2 border rounded-lg bg-white focus:ring-2 focus:ring-[#F7631B] outline-none font-semibold shadow-sm" placeholder="Enter Team Name">
                 </div>
 
                 <div>
                     <label class="block text-sm font-medium text-gray-600 mb-1 font-bold">⚾ Bowling Team</label>
-                    <select id="bowling-team" class="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-[#F7631B] outline-none font-semibold">
+                    <select id="bowling-team-select" onchange="toggleCustomTeam('bowling')" class="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-[#F7631B] outline-none font-semibold">
                         <option value="MBA">MBA</option>
                         <option value="B.Tech">B.Tech</option>
                         <option value="B.Com">B.Com</option>
+                        <option value="custom" class="text-brand-primary font-bold">+ Custom Team Name</option>
                     </select>
+                    <input type="text" id="bowling-team-input" class="hidden w-full p-3 mt-2 border rounded-lg bg-white focus:ring-2 focus:ring-[#F7631B] outline-none font-semibold shadow-sm" placeholder="Enter Team Name">
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
@@ -505,12 +509,13 @@
                 const matches = [];
                 querySnapshot.forEach(doc => matches.push({id: doc.id, ...doc.data()}));
                 
-                // We only care about matches current user is scoring that aren't finished
+                // Find match this user is scoring that isn't already closed
                 const active = matches.find(m => m.scorerId === user.uid && m.status !== "Finished" && m.status !== "Abandoned");
                 
                 if (active) {
                     let lastActiveTime = new Date();
-                    // Firebase timestamp handling logic
+                    
+                    // Firebase timestamp handling
                     if (active.lastUpdated && typeof active.lastUpdated.toDate === 'function') {
                         lastActiveTime = active.lastUpdated.toDate();
                     } else if (active.lastUpdated && active.lastUpdated.seconds) {
@@ -521,8 +526,7 @@
 
                     const diffMinutes = (new Date() - lastActiveTime) / 1000 / 60;
 
-                    // If more than 15 minutes of inactivity
-                    if (diffMinutes > 15) {
+                    if (active.status === "Live" && diffMinutes > 20) {
                         const matchRef = doc(db, 'artifacts', appId, 'public', 'data', 'matches', active.id);
                         await setDoc(matchRef, { 
                             ...active, 
@@ -532,9 +536,9 @@
                             lastUpdated: serverTimestamp()
                         }, { merge: true });
 
-                        showToast("A previous match was abandoned due to inactivity (>15m)", "warning");
+                        showToast("Match abandoned due to 20m inactivity (No score update)", "warning");
                         
-                        // If user was currently in that match scoring, kick them out
+                        // If scorer is currently in the match screen, kick them out
                         if (currentMatchId === active.id) {
                             location.reload(); 
                         }
@@ -644,7 +648,6 @@
             } else if (!historyScreen.classList.contains('hidden')) {
                 hideHistory();
             } else if (!viewerScreen.classList.contains('hidden')) {
-                // If checking out via URL, back button goes to Setup
                 stopWatching();
             } else if (!resultScreen.classList.contains('hidden')) {
                 location.reload();
@@ -663,9 +666,30 @@
             };
         }
 
+        window.toggleCustomTeam = function(type) {
+            const select = document.getElementById(`${type}-team-select`);
+            const input = document.getElementById(`${type}-team-input`);
+            if (select.value === 'custom') {
+                input.classList.remove('hidden');
+                input.focus();
+            } else {
+                input.classList.add('hidden');
+            }
+        };
+
         window.startMatch = async function() {
-            const bTeam = document.getElementById('batting-team').value;
-            const boTeam = document.getElementById('bowling-team').value;
+            let bTeam = document.getElementById('batting-team-select').value;
+            if (bTeam === 'custom') {
+                bTeam = document.getElementById('batting-team-input').value.trim();
+                if (!bTeam) { showToast("Please enter Batting Team name", "error"); return; }
+            }
+
+            let boTeam = document.getElementById('bowling-team-select').value;
+            if (boTeam === 'custom') {
+                boTeam = document.getElementById('bowling-team-input').value.trim();
+                if (!boTeam) { showToast("Please enter Bowling Team name", "error"); return; }
+            }
+
             if(bTeam === boTeam) { 
                 showToast("Cannot select same team for both!", "error"); 
                 return; 
