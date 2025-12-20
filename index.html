@@ -128,7 +128,14 @@
 
         <!-- Viewer Screen -->
         <div id="viewer-screen" class="hidden flex-grow flex flex-col relative">
-             <div class="bg-gray-900 text-white p-6 text-center">
+             <div class="bg-gray-900 text-white p-6 text-center relative">
+                <!-- Viewer Share Button -->
+                <button onclick="shareCurrentMatch()" class="absolute top-4 right-4 p-2 bg-gray-800 hover:bg-gray-700 rounded-full text-gray-300 transition-colors" title="Share Match Link">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    </svg>
+                </button>
+
                 <div class="flex justify-between items-center mb-1">
                     <span id="v-display-teams" class="text-sm font-medium text-gray-400 uppercase tracking-widest font-bold">Loading...</span>
                     <span id="v-display-target" class="text-sm text-[#F7631B] font-bold hidden uppercase">TARGET: 0</span>
@@ -166,7 +173,14 @@
 
         <!-- Scoring Screen -->
         <div id="scoring-screen" class="hidden flex-grow flex flex-col relative">
-            <div class="bg-gray-900 text-white p-6 text-center">
+            <div class="bg-gray-900 text-white p-6 text-center relative">
+                <!-- Scorer Share Button -->
+                <button onclick="shareCurrentMatch()" class="absolute top-4 right-4 p-2 bg-gray-800 hover:bg-gray-700 rounded-full text-gray-300 transition-colors" title="Share Match Link">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    </svg>
+                </button>
+
                 <div class="flex justify-between items-center mb-1">
                     <span id="display-teams" class="text-sm font-medium text-gray-400 uppercase tracking-widest font-bold">Loading...</span>
                     <span id="display-target" class="text-sm text-[#F7631B] font-bold hidden uppercase">TARGET: 0</span>
@@ -273,6 +287,8 @@
 
         let user = null;
         let currentMatchId = null;
+        let activeViewerMatchId = null; // Track viewer match separately
+        let viewerMatchData = null; // Track viewer data for sharing
         let unsubscribeMatch = null;
         let unsubscribeHistory = null; 
         let activeMatchData = null; 
@@ -335,14 +351,99 @@
             if(confirmResolve) confirmResolve(false);
         };
 
+        // --- Sharing Logic ---
+        window.shareCurrentMatch = async function() {
+            let idToShare = null;
+            let data = null;
+
+            // Determine context and data
+            if (!document.getElementById('viewer-screen').classList.contains('hidden')) {
+                idToShare = activeViewerMatchId;
+                data = viewerMatchData;
+            } else if (!document.getElementById('scoring-screen').classList.contains('hidden')) {
+                idToShare = currentMatchId;
+                data = match;
+            }
+
+            if (!idToShare || !data) {
+                showToast("No active match to share", "error");
+                return;
+            }
+
+            // Construct the URL
+            const urlObj = new URL(window.location.href);
+            urlObj.searchParams.set('matchId', idToShare);
+            const shareUrl = urlObj.toString();
+
+            // Construct Status Message
+            const overs = Math.floor(data.balls / 6) + "." + (data.balls % 6);
+            let statusMsg = "Live";
+            
+            if (data.result) statusMsg = data.result;
+            else if (data.isAbandoned) statusMsg = "Abandoned";
+            else if (data.isOnBreak) statusMsg = "Break";
+            else if (data.target) {
+                const runsNeeded = data.target - data.runs;
+                const ballsLeft = (data.maxOvers * 6) - data.balls;
+                statusMsg = `Target ${data.target} | Need ${runsNeeded} off ${ballsLeft} balls`;
+            }
+
+            const title = "Gully Premier League Live Score";
+            const text = `🏏 ${data.battingTeam} vs ${data.bowlingTeam} ⚾\nScore: ${data.runs}/${data.wickets} (${overs} Overs)\nStatus: ${statusMsg}\n\nWatch Live Scoring:`;
+
+            // Native Share with Fallback
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: title,
+                        text: text,
+                        url: shareUrl
+                    });
+                } catch (err) {
+                    console.log("Share canceled or failed", err);
+                }
+            } else {
+                // Clipboard Fallback for desktops/iframe restrictions
+                const fullMsg = `${text} ${shareUrl}`;
+                try {
+                    await navigator.clipboard.writeText(fullMsg);
+                    showToast("Match Status & Link Copied!", "success");
+                } catch (err) {
+                    // Legacy Fallback
+                    const textArea = document.createElement("textarea");
+                    textArea.value = fullMsg;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    try {
+                        document.execCommand('copy');
+                        showToast("Match Status & Link Copied!", "success");
+                    } catch (e) {
+                        showToast("Could not copy link", "error");
+                    }
+                    document.body.removeChild(textArea);
+                }
+            }
+        };
+
         const initAuth = async () => {
             try {
                 const cred = await signInAnonymously(auth);
                 user = cred.user;
-                // Initial check
-                checkForActiveMatch();
-                // Set background checker every minute
-                setInterval(checkForActiveMatch, 60000);
+                
+                // Check if user came via a shared link
+                const urlParams = new URLSearchParams(window.location.search);
+                const sharedMatchId = urlParams.get('matchId');
+
+                if (sharedMatchId) {
+                    showToast("Loading Shared Match...", "info");
+                    startWatching(sharedMatchId);
+                } else {
+                    // Normal startup
+                    checkForActiveMatch();
+                    // Set background checker every minute
+                    setInterval(checkForActiveMatch, 60000);
+                }
+
             } catch (err) { 
                 showToast("Auth Failed: " + err.message, "error"); 
             }
@@ -507,6 +608,7 @@
             } else if (!historyScreen.classList.contains('hidden')) {
                 hideHistory();
             } else if (!viewerScreen.classList.contains('hidden')) {
+                // If checking out via URL, back button goes to Setup
                 stopWatching();
             } else if (!resultScreen.classList.contains('hidden')) {
                 location.reload();
@@ -825,6 +927,7 @@
         };
 
         window.startWatching = function(matchId) {
+            activeViewerMatchId = matchId; // Store for sharing logic
             if (unsubscribeHistory) unsubscribeHistory();
             unsubscribeHistory = null;
             historyScreen.classList.add('hidden');
@@ -846,6 +949,7 @@
         };
 
         function updateViewerUI(data) {
+            viewerMatchData = data; // Store latest data for sharing
             document.getElementById('v-display-teams').innerText = `🏏 ${data.battingTeam} vs ⚾ ${data.bowlingTeam}`;
             document.getElementById('v-runs').innerText = data.runs; document.getElementById('v-wickets').innerText = data.wickets;
             document.getElementById('v-overs').innerText = formatOvers(data.balls); document.getElementById('v-limit').innerText = data.maxOvers;
@@ -889,6 +993,14 @@
         }
 
         window.stopWatching = function() {
+            activeViewerMatchId = null; // Reset
+            // Clear URL param if present
+            const url = new URL(window.location.href);
+            if (url.searchParams.has('matchId')) {
+                url.searchParams.delete('matchId');
+                window.history.pushState({}, '', url);
+            }
+
             if (unsubscribeMatch) unsubscribeMatch(); unsubscribeMatch = null;
             viewerScreen.classList.add('hidden'); showHistory(); 
             showToast("Returned to logs", "info");
