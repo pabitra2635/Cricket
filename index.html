@@ -144,15 +144,15 @@
                 <div class="space-y-3">
                     <div>
                         <label class="text-[10px] font-bold text-gray-500 uppercase">Striker</label>
-                        <input type="text" id="init-striker" class="w-full p-3 border rounded-lg bg-gray-50 font-bold focus:ring-2 focus:ring-[#F7631B] outline-none" placeholder="Batsman 1">
+                        <input type="text" id="init-striker" class="w-full p-3 border rounded-lg bg-gray-50 font-bold focus:ring-2 focus:ring-[#F7631B] outline-none" placeholder="Enter Name">
                     </div>
                     <div>
                         <label class="text-[10px] font-bold text-gray-500 uppercase">Non-Striker</label>
-                        <input type="text" id="init-non-striker" class="w-full p-3 border rounded-lg bg-gray-50 font-bold focus:ring-2 focus:ring-[#F7631B] outline-none" placeholder="Batsman 2">
+                        <input type="text" id="init-non-striker" class="w-full p-3 border rounded-lg bg-gray-50 font-bold focus:ring-2 focus:ring-[#F7631B] outline-none" placeholder="Enter Name">
                     </div>
                     <div>
                         <label class="text-[10px] font-bold text-gray-500 uppercase">Opening Bowler</label>
-                        <input type="text" id="init-bowler" class="w-full p-3 border rounded-lg bg-gray-50 font-bold focus:ring-2 focus:ring-[#F7631B] outline-none" placeholder="Bowler 1">
+                        <input type="text" id="init-bowler" class="w-full p-3 border rounded-lg bg-gray-50 font-bold focus:ring-2 focus:ring-[#F7631B] outline-none" placeholder="Enter Name">
                     </div>
                 </div>
                 <button onclick="submitInitialPlayers()" class="w-full mt-6 bg-brand-primary text-white font-bold py-3 rounded-xl shadow-lg uppercase tracking-widest">Start Scoring</button>
@@ -198,6 +198,24 @@
                 </div>
 
                 <button onclick="submitNextBowler()" class="w-full mt-6 bg-brand-primary text-white font-bold py-3 rounded-xl shadow-lg uppercase tracking-widest">Start Over</button>
+            </div>
+        </div>
+
+        <!-- No Ball Run Selection Modal -->
+        <div id="nb-runs-modal" class="hidden fixed inset-0 z-[95] flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="document.getElementById('nb-runs-modal').classList.add('hidden')"></div>
+            <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 modal-enter text-center">
+                <h3 class="text-lg font-black text-gray-800 mb-2 uppercase">No Ball</h3>
+                <p class="text-sm text-gray-500 mb-4">Runs scored off the bat?</p>
+                <div class="grid grid-cols-3 gap-3">
+                    <button onclick="confirmNoBall(0)" class="p-3 bg-gray-100 rounded-xl font-bold hover:bg-gray-200">0</button>
+                    <button onclick="confirmNoBall(1)" class="p-3 bg-gray-100 rounded-xl font-bold hover:bg-gray-200">1</button>
+                    <button onclick="confirmNoBall(2)" class="p-3 bg-gray-100 rounded-xl font-bold hover:bg-gray-200">2</button>
+                    <button onclick="confirmNoBall(3)" class="p-3 bg-gray-100 rounded-xl font-bold hover:bg-gray-200">3</button>
+                    <button onclick="confirmNoBall(4)" class="p-3 bg-orange-100 text-orange-600 rounded-xl font-bold hover:bg-orange-200">4</button>
+                    <button onclick="confirmNoBall(6)" class="p-3 bg-orange-600 text-white rounded-xl font-bold hover:bg-orange-700">6</button>
+                </div>
+                <button onclick="document.getElementById('nb-runs-modal').classList.add('hidden')" class="mt-4 text-xs font-bold text-gray-400 uppercase hover:text-gray-600">Cancel</button>
             </div>
         </div>
 
@@ -614,9 +632,9 @@
             let nonStriker = document.getElementById('init-non-striker').value.trim();
             let bowler = document.getElementById('init-bowler').value.trim();
 
-            if(!striker) striker = "Batsman 1";
-            if(!nonStriker) nonStriker = "Batsman 2";
-            if(!bowler) bowler = "Bowler 1";
+            if(!striker) striker = `${match.battingTeam} Batter 1`;
+            if(!nonStriker) nonStriker = `${match.battingTeam} Batter 2`;
+            if(!bowler) bowler = `${match.bowlingTeam} Bowler 1`;
 
             match.striker = striker;
             match.nonStriker = nonStriker;
@@ -639,7 +657,7 @@
                 // Wicket 1 down = 2 batsmen were on crease (1 & 2). New one is 3.
                 // Wicket count is updated BEFORE this modal.
                 // If 1 wicket, Batsman 3. If 2 wickets, Batsman 4.
-                name = `Batsman ${match.wickets + 2}`;
+                name = `${match.battingTeam} Batter ${match.wickets + 2}`;
             }
             match.striker = name; // Assuming incoming batsman takes strike
             document.getElementById('new-batsman-modal').classList.add('hidden');
@@ -659,7 +677,7 @@
             } else if (existing) {
                 finalBowler = existing;
             } else {
-                finalBowler = `Bowler ${match.bowlersList.length + 1}`;
+                finalBowler = `${match.bowlingTeam} Bowler ${match.bowlersList.length + 1}`;
                 match.bowlersList.push(finalBowler);
             }
 
@@ -671,6 +689,41 @@
             updateDisplay();
             await syncToCloud();
             showToast("New Over Started", "info");
+        };
+
+        window.confirmNoBall = async function(batRuns) {
+            document.getElementById('nb-runs-modal').classList.add('hidden');
+            saveState();
+            
+            // Logic: 1 run for NB penalty + batRuns
+            const totalRuns = 1 + batRuns;
+            match.runs += totalRuns;
+            
+            // Notation: "NB" if 0, "NB+4" etc.
+            const notation = batRuns > 0 ? `NB+${batRuns}` : 'NB';
+            match.overHistory.push(notation);
+            
+            // Stats - Bowler
+            const bStats = getStats(match.bowler);
+            bStats.runsConceded += totalRuns;
+            // Note: ballsBowled does NOT increment for NB (illegal delivery)
+            
+            // Stats - Striker
+            const sStats = getStats(match.striker);
+            sStats.runs += batRuns;
+            sStats.balls += 1; // Count NB as ball faced for batsman stats
+            
+            // Rotate strike if runs off bat is odd
+            if (batRuns % 2 !== 0) {
+                const temp = match.striker;
+                match.striker = match.nonStriker;
+                match.nonStriker = temp;
+            }
+            
+            checkInningsStatus(); 
+            updateDisplay(); 
+            await syncToCloud();
+            showToast(`No Ball + ${batRuns} runs recorded`, "success");
         };
 
         window.rotateStrike = async function() {
@@ -1195,6 +1248,19 @@
 
         window.addExtra = async function(type) {
             if (match.isOnBreak || match.isAbandoned) return;
+            
+            if (type === 'NB') {
+                // Open Modal for runs
+                const nbModal = document.getElementById('nb-runs-modal');
+                nbModal.classList.remove('hidden');
+                nbModal.querySelector('.relative').classList.add('modal-enter');
+                setTimeout(() => {
+                    nbModal.querySelector('.relative').classList.remove('modal-enter');
+                    nbModal.querySelector('.relative').classList.add('modal-active');
+                }, 10);
+                return;
+            }
+
             saveState();
             match.runs += 1; match.overHistory.push(type);
             
@@ -1396,19 +1462,21 @@
             currentOverBalls.forEach(ball => {
                 const span = document.createElement('span');
                 span.className = 'ball-dot ' + getBallColor(ball);
+                if(ball.toString().length > 2) span.classList.add('text-[10px]', '!px-1');
                 span.innerText = ball; container.appendChild(span);
             });
         }
 
         function getBallColor(val) {
-            if (val === 0) return 'bg-gray-50 text-gray-400 border-gray-200';
-            if (val === 1) return 'bg-white text-gray-600 border-gray-200';
-            if (val === 2) return 'bg-white text-gray-700 border-gray-300';
-            if (val === 3) return 'bg-white text-gray-800 border-gray-400';
-            if (val === 4) return 'bg-blue-500 text-white border-blue-600 shadow-sm';
-            if (val === 6) return 'bg-[#F7631B] text-white border-orange-600 shadow-sm';
-            if (val === 'W') return 'bg-red-500 text-white border-red-600 shadow-sm';
-            if (val === 'WD' || val === 'NB') return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+            const s = val.toString();
+            if (s === '0') return 'bg-gray-50 text-gray-400 border-gray-200';
+            if (s === '1') return 'bg-white text-gray-600 border-gray-200';
+            if (s === '2') return 'bg-white text-gray-700 border-gray-300';
+            if (s === '3') return 'bg-white text-gray-800 border-gray-400';
+            if (s === '4') return 'bg-blue-500 text-white border-blue-600 shadow-sm';
+            if (s === '6') return 'bg-[#F7631B] text-white border-orange-600 shadow-sm';
+            if (s === 'W') return 'bg-red-500 text-white border-red-600 shadow-sm';
+            if (s === 'WD' || s.startsWith('NB')) return 'bg-yellow-100 text-yellow-800 border-yellow-300';
             return 'bg-white text-gray-800 border-gray-300';
         }
 
