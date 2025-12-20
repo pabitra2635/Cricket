@@ -136,6 +136,71 @@
             </div>
         </div>
 
+        <!-- Initial Players Modal -->
+        <div id="initial-players-modal" class="hidden fixed inset-0 z-[95] flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/80 backdrop-blur-sm"></div>
+            <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 modal-enter">
+                <h3 class="text-lg font-black text-gray-800 mb-4 uppercase">Match Starters</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Striker</label>
+                        <input type="text" id="init-striker" class="w-full p-3 border rounded-lg bg-gray-50 font-bold focus:ring-2 focus:ring-[#F7631B] outline-none" placeholder="Batsman 1">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Non-Striker</label>
+                        <input type="text" id="init-non-striker" class="w-full p-3 border rounded-lg bg-gray-50 font-bold focus:ring-2 focus:ring-[#F7631B] outline-none" placeholder="Batsman 2">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Opening Bowler</label>
+                        <input type="text" id="init-bowler" class="w-full p-3 border rounded-lg bg-gray-50 font-bold focus:ring-2 focus:ring-[#F7631B] outline-none" placeholder="Bowler Name">
+                    </div>
+                </div>
+                <button onclick="submitInitialPlayers()" class="w-full mt-6 bg-brand-primary text-white font-bold py-3 rounded-xl shadow-lg uppercase tracking-widest">Start Scoring</button>
+            </div>
+        </div>
+
+        <!-- New Batsman Modal -->
+        <div id="new-batsman-modal" class="hidden fixed inset-0 z-[95] flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/80 backdrop-blur-sm"></div>
+            <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 modal-enter">
+                <div class="text-center mb-4">
+                    <div class="text-4xl mb-2">☝️</div>
+                    <h3 class="text-lg font-black text-gray-800 uppercase">Wicket Fall!</h3>
+                    <p class="text-sm text-gray-500">Who is the new batsman?</p>
+                </div>
+                <input type="text" id="new-batsman-name" class="w-full p-3 border rounded-lg bg-gray-50 font-bold focus:ring-2 focus:ring-[#F7631B] outline-none mb-4" placeholder="Enter Name">
+                <button onclick="submitNewBatsman()" class="w-full bg-brand-primary text-white font-bold py-3 rounded-xl shadow-lg uppercase tracking-widest">Update Striker</button>
+            </div>
+        </div>
+
+        <!-- Next Bowler Modal -->
+        <div id="next-bowler-modal" class="hidden fixed inset-0 z-[95] flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/80 backdrop-blur-sm"></div>
+            <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 modal-enter">
+                <div class="text-center mb-4">
+                    <div class="text-4xl mb-2">🏁</div>
+                    <h3 class="text-lg font-black text-gray-800 uppercase">Over Complete</h3>
+                    <p class="text-sm text-gray-500">Select bowler for next over</p>
+                </div>
+                
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Select Existing</label>
+                        <select id="existing-bowler-select" class="w-full p-3 border rounded-lg bg-gray-50 font-bold outline-none mb-2" onchange="document.getElementById('new-bowler-name').value = ''">
+                            <option value="">-- Select --</option>
+                        </select>
+                    </div>
+                    <div class="text-center text-xs font-bold text-gray-400">- OR -</div>
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">New Bowler</label>
+                        <input type="text" id="new-bowler-name" class="w-full p-3 border rounded-lg bg-gray-50 font-bold focus:ring-2 focus:ring-[#F7631B] outline-none" placeholder="Enter Name" oninput="document.getElementById('existing-bowler-select').value = ''">
+                    </div>
+                </div>
+
+                <button onclick="submitNextBowler()" class="w-full mt-6 bg-brand-primary text-white font-bold py-3 rounded-xl shadow-lg uppercase tracking-widest">Start Over</button>
+            </div>
+        </div>
+
         <!-- Toss Modal -->
         <div id="toss-modal" class="hidden fixed inset-0 z-[90] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onclick="closeTossModal()"></div>
@@ -448,7 +513,8 @@
             isAbandoned: false,
             result: null,
             striker: "Striker", nonStriker: "Non-Striker", bowler: "Bowler",
-            playerStats: {} // { "PlayerName": { runs: 0, balls: 0, wickets: 0, runsConceded: 0, ballsBowled: 0 } }
+            playerStats: {}, // { "PlayerName": { runs: 0, balls: 0, wickets: 0, runsConceded: 0, ballsBowled: 0 } }
+            bowlersList: [] // Track list of bowlers
         };
 
         // --- Toast System ---
@@ -536,6 +602,69 @@
             } else {
                 showToast("Name cannot be empty", "error");
             }
+        };
+
+        window.submitInitialPlayers = async function() {
+            const striker = document.getElementById('init-striker').value.trim();
+            const nonStriker = document.getElementById('init-non-striker').value.trim();
+            const bowler = document.getElementById('init-bowler').value.trim();
+
+            if(!striker || !nonStriker || !bowler) {
+                showToast("Please fill all player names", "error");
+                return;
+            }
+
+            match.striker = striker;
+            match.nonStriker = nonStriker;
+            match.bowler = bowler;
+            match.bowlersList = [bowler]; // Init bowler list
+
+            document.getElementById('initial-players-modal').classList.add('hidden');
+            scoringScreen.classList.remove('hidden');
+            backBtn.classList.remove('hidden');
+            resumeContainer.classList.add('hidden');
+            
+            updateDisplay();
+            await syncToCloud();
+            showToast("Match Started!", "success");
+        };
+
+        window.submitNewBatsman = async function() {
+            const name = document.getElementById('new-batsman-name').value.trim();
+            if(!name) {
+                showToast("Please enter new batsman name", "error");
+                return;
+            }
+            match.striker = name; // Assuming incoming batsman takes strike
+            document.getElementById('new-batsman-modal').classList.add('hidden');
+            document.getElementById('new-batsman-name').value = '';
+            updateDisplay();
+            await syncToCloud();
+        };
+
+        window.submitNextBowler = async function() {
+            const existing = document.getElementById('existing-bowler-select').value;
+            const newName = document.getElementById('new-bowler-name').value.trim();
+            
+            let finalBowler = "";
+            if(newName) {
+                finalBowler = newName;
+                if(!match.bowlersList.includes(newName)) match.bowlersList.push(newName);
+            } else if (existing) {
+                finalBowler = existing;
+            } else {
+                showToast("Select or Enter a Bowler", "error");
+                return;
+            }
+
+            match.bowler = finalBowler;
+            document.getElementById('next-bowler-modal').classList.add('hidden');
+            document.getElementById('new-bowler-name').value = '';
+            document.getElementById('existing-bowler-select').value = '';
+            
+            updateDisplay();
+            await syncToCloud();
+            showToast("New Over Started", "info");
         };
 
         window.rotateStrike = async function() {
@@ -871,7 +1000,8 @@
                 striker: activeMatchData.striker || "Striker",
                 nonStriker: activeMatchData.nonStriker || "Non-Striker",
                 bowler: activeMatchData.bowler || "Bowler",
-                playerStats: activeMatchData.playerStats || {}
+                playerStats: activeMatchData.playerStats || {},
+                bowlersList: activeMatchData.bowlersList || []
             };
             setupScreen.classList.add('hidden');
             scoringScreen.classList.remove('hidden');
@@ -954,7 +1084,8 @@
                 isAbandoned: false,
                 result: null,
                 striker: "Striker", nonStriker: "Non-Striker", bowler: "Bowler",
-                playerStats: {}
+                playerStats: {},
+                bowlersList: []
             };
         }
 
@@ -992,12 +1123,15 @@
             match.startTime = new Date().toISOString();
             currentMatchId = "match_" + Date.now();
             setupScreen.classList.add('hidden');
-            scoringScreen.classList.remove('hidden');
-            backBtn.classList.remove('hidden');
-            resumeContainer.classList.add('hidden');
-            await syncToCloud();
-            updateDisplay();
-            showToast("Match Started!", "success");
+            
+            // Show Initial Players Modal instead of going directly to scoring
+            const initModal = document.getElementById('initial-players-modal');
+            initModal.classList.remove('hidden');
+            initModal.querySelector('.relative').classList.add('modal-enter');
+            setTimeout(() => {
+                initModal.querySelector('.relative').classList.remove('modal-enter');
+                initModal.querySelector('.relative').classList.add('modal-active');
+            }, 10);
         };
 
         async function syncToCloud() {
@@ -1030,15 +1164,11 @@
             match.runs += r; match.balls++; match.overHistory.push(r);
             
             // --- Stats Update ---
-            // Striker
             const sStats = getStats(match.striker);
-            sStats.runs += r;
-            sStats.balls += 1;
+            sStats.runs += r; sStats.balls += 1;
             
-            // Bowler
             const bStats = getStats(match.bowler);
-            bStats.runsConceded += r;
-            bStats.ballsBowled += 1;
+            bStats.runsConceded += r; bStats.ballsBowled += 1;
             // --------------------
 
             // Auto-rotate strike on 1s and 3s
@@ -1048,6 +1178,9 @@
                 match.nonStriker = temp;
             }
 
+            // Check for over completion
+            if (match.balls % 6 === 0) handleEndOfOver();
+            
             checkInningsStatus(); updateDisplay(); await syncToCloud();
         };
 
@@ -1057,10 +1190,8 @@
             match.runs += 1; match.overHistory.push(type);
             
             // --- Stats Update ---
-            // Bowler (Extras usually counted against bowler, but no valid ball)
             const bStats = getStats(match.bowler);
             bStats.runsConceded += 1;
-            // Note: WD/NB do not count as balls faced by striker in strict stats
             // --------------------
 
             updateDisplay(); await syncToCloud();
@@ -1072,18 +1203,55 @@
             match.wickets++; match.balls++; match.overHistory.push('W');
             
             // --- Stats Update ---
-            // Striker (Out counts as a ball faced)
             const sStats = getStats(match.striker);
             sStats.balls += 1;
             
-            // Bowler
             const bStats = getStats(match.bowler);
-            bStats.wickets += 1;
-            bStats.ballsBowled += 1;
+            bStats.wickets += 1; bStats.ballsBowled += 1;
             // --------------------
+
+            // Show New Batsman Modal
+            const newBatModal = document.getElementById('new-batsman-modal');
+            newBatModal.classList.remove('hidden');
+            newBatModal.querySelector('.relative').classList.add('modal-enter');
+            setTimeout(() => {
+                newBatModal.querySelector('.relative').classList.remove('modal-enter');
+                newBatModal.querySelector('.relative').classList.add('modal-active');
+                document.getElementById('new-batsman-name').focus();
+            }, 10);
+
+            // Check for over completion
+            if (match.balls % 6 === 0) handleEndOfOver();
 
             checkInningsStatus(); updateDisplay(); await syncToCloud();
         };
+
+        function handleEndOfOver() {
+            // Rotate Strike at end of over
+            const temp = match.striker;
+            match.striker = match.nonStriker;
+            match.nonStriker = temp;
+
+            // Populate Bowler Select
+            const select = document.getElementById('existing-bowler-select');
+            select.innerHTML = '<option value="">-- Select --</option>';
+            match.bowlersList.forEach(b => {
+                if (b !== match.bowler) { // Don't allow same bowler consecutively in standard logic, though gully allows.
+                     const opt = document.createElement('option');
+                     opt.value = b; opt.innerText = b;
+                     select.appendChild(opt);
+                }
+            });
+
+            // Show Modal
+            const modal = document.getElementById('next-bowler-modal');
+            modal.classList.remove('hidden');
+            modal.querySelector('.relative').classList.add('modal-enter');
+            setTimeout(() => {
+                modal.querySelector('.relative').classList.remove('modal-enter');
+                modal.querySelector('.relative').classList.add('modal-active');
+            }, 10);
+        }
 
         function checkInningsStatus() {
             const totalBalls = match.maxOvers * 6;
@@ -1109,9 +1277,18 @@
             
             // Reset Players
             match.striker = "Striker"; match.nonStriker = "Non-Striker"; match.bowler = "Bowler";
+            match.bowlersList = []; // New innings, new bowlers (or same players but bowling for other team now)
 
             document.getElementById('display-target').classList.remove('hidden');
             document.getElementById('rrr-container').classList.remove('hidden');
+            
+            // Re-prompt for initial players for 2nd innings? Ideally yes, but sticking to flow.
+            // Let's trigger the initial popup again for the new innings.
+            const initModal = document.getElementById('initial-players-modal');
+            document.getElementById('init-striker').value = '';
+            document.getElementById('init-non-striker').value = '';
+            document.getElementById('init-bowler').value = '';
+            initModal.classList.remove('hidden');
         }
 
         function endMatch(winner) {
@@ -1225,7 +1402,7 @@
             match.history.push(JSON.stringify({
                 runs: match.runs, wickets: match.wickets, balls: match.balls, overHistory: [...match.overHistory],
                 striker: match.striker, nonStriker: match.nonStriker, bowler: match.bowler,
-                playerStats: statsCopy
+                playerStats: statsCopy, bowlersList: [...match.bowlersList]
             }));
             if (match.history.length > 30) match.history.shift();
             match.redoStack = [];
@@ -1237,7 +1414,7 @@
             match.redoStack.push(JSON.stringify({
                 runs: match.runs, wickets: match.wickets, balls: match.balls, overHistory: [...match.overHistory],
                 striker: match.striker, nonStriker: match.nonStriker, bowler: match.bowler,
-                playerStats: statsCopy
+                playerStats: statsCopy, bowlersList: [...match.bowlersList]
             }));
             const prevState = JSON.parse(match.history.pop());
             match.runs = prevState.runs; match.wickets = prevState.wickets;
@@ -1246,6 +1423,7 @@
             if(prevState.nonStriker) match.nonStriker = prevState.nonStriker;
             if(prevState.bowler) match.bowler = prevState.bowler;
             if(prevState.playerStats) match.playerStats = prevState.playerStats;
+            if(prevState.bowlersList) match.bowlersList = prevState.bowlersList;
             
             updateDisplay(); await syncToCloud();
             showToast("Action Undone", "info");
@@ -1257,7 +1435,7 @@
             match.history.push(JSON.stringify({
                 runs: match.runs, wickets: match.wickets, balls: match.balls, overHistory: [...match.overHistory],
                 striker: match.striker, nonStriker: match.nonStriker, bowler: match.bowler,
-                playerStats: statsCopy
+                playerStats: statsCopy, bowlersList: [...match.bowlersList]
             }));
             const nextState = JSON.parse(match.redoStack.pop());
             match.runs = nextState.runs; match.wickets = nextState.wickets;
@@ -1266,6 +1444,7 @@
             if(nextState.nonStriker) match.nonStriker = nextState.nonStriker;
             if(nextState.bowler) match.bowler = nextState.bowler;
             if(nextState.playerStats) match.playerStats = nextState.playerStats;
+            if(nextState.bowlersList) match.bowlersList = nextState.bowlersList;
 
             updateDisplay(); await syncToCloud();
             showToast("Action Redone", "info");
