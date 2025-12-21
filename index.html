@@ -999,54 +999,70 @@
                 const matches = [];
                 querySnapshot.forEach(doc => matches.push({id: doc.id, ...doc.data()}));
                 
-                // Find match this user is scoring that isn't already closed
-                const active = matches.find(m => m.scorerId === user.uid && m.status !== "Finished" && m.status !== "Abandoned");
+                const now = new Date();
                 
-                if (active) {
-                    let lastActiveTime = new Date();
+                // 1. GLOBAL CLEANUP: Identify ALL stale matches (not just the current user's)
+                const staleMatches = matches.filter(m => {
+                    if (m.status !== 'Live' && m.status !== 'On Break') return false;
                     
-                    // Firebase timestamp handling
-                    if (active.lastUpdated && typeof active.lastUpdated.toDate === 'function') {
-                        lastActiveTime = active.lastUpdated.toDate();
-                    } else if (active.lastUpdated && active.lastUpdated.seconds) {
-                        lastActiveTime = new Date(active.lastUpdated.seconds * 1000);
-                    } else if (typeof active.lastUpdated === 'string') {
-                        lastActiveTime = new Date(active.lastUpdated);
-                    } else if (active.startTime) {
-                        lastActiveTime = new Date(active.startTime);
+                    let lastActiveTime = new Date();
+                    if (m.lastUpdated && typeof m.lastUpdated.toDate === 'function') {
+                        lastActiveTime = m.lastUpdated.toDate();
+                    } else if (m.lastUpdated && m.lastUpdated.seconds) {
+                        lastActiveTime = new Date(m.lastUpdated.seconds * 1000);
+                    } else if (typeof m.lastUpdated === 'string') {
+                        lastActiveTime = new Date(m.lastUpdated);
+                    } else if (m.startTime) {
+                        lastActiveTime = new Date(m.startTime);
                     }
 
-                    const diffMinutes = (new Date() - lastActiveTime) / 1000 / 60;
+                    const diffMinutes = (now - lastActiveTime) / 1000 / 60;
+                    return diffMinutes > 30;
+                });
 
-                    // Updated Logic: Check for Live OR On Break, and diff > 30 mins
-                    if ((active.status === "Live" || active.status === "On Break") && diffMinutes > 30) {
-                        const matchRef = doc(db, 'artifacts', appId, 'public', 'data', 'matches', active.id);
-                        await setDoc(matchRef, { 
-                            ...active, 
+                // Update stale matches to Abandoned
+                if (staleMatches.length > 0) {
+                    const updates = staleMatches.map(m => {
+                        const matchRef = doc(db, 'artifacts', appId, 'public', 'data', 'matches', m.id);
+                        return setDoc(matchRef, { 
+                            ...m, 
                             status: "Abandoned", 
                             isAbandoned: true,
                             endTime: new Date().toISOString(),
                             lastUpdated: serverTimestamp()
                         }, { merge: true });
+                    });
+                    await Promise.all(updates);
+                    console.log(`Auto-abandoned ${staleMatches.length} stale matches.`);
+                }
 
-                        showToast("Match abandoned due to 30m inactivity", "warning");
-                        
-                        // If scorer is currently in the match screen, kick them out
-                        if (currentMatchId === active.id) {
-                            location.reload(); 
-                        }
-                        
-                        activeMatchData = null;
-                        resumeContainer.classList.add('hidden');
-                    } else {
-                        activeMatchData = active;
-                        resumeInfo.innerText = `🏏 ${active.battingTeam} vs ⚾ ${active.bowlingTeam}`;
-                        // Only show resume button if we are on the setup screen
-                        if (!setupScreen.classList.contains('hidden')) {
-                            resumeContainer.classList.remove('hidden');
-                        }
+                // 2. USER RESUME CHECK
+                // Filter out the matches we just identified as stale to prevent resuming them
+                const staleIds = staleMatches.map(sm => sm.id);
+                
+                // Find match this user is scoring that isn't finished/abandoned AND wasn't just marked stale
+                const active = matches.find(m => 
+                    m.scorerId === user.uid && 
+                    m.status !== "Finished" && 
+                    m.status !== "Abandoned" &&
+                    !staleIds.includes(m.id)
+                );
+                
+                if (active) {
+                    activeMatchData = active;
+                    resumeInfo.innerText = `🏏 ${active.battingTeam} vs ⚾ ${active.bowlingTeam}`;
+                    // Only show resume button if we are on the setup screen
+                    if (!setupScreen.classList.contains('hidden')) {
+                        resumeContainer.classList.remove('hidden');
                     }
                 } else {
+                    // Safety check: If the user is currently SCORING a match that just got marked stale (e.g. left tab open 31 mins), kick them out
+                    if (currentMatchId && staleIds.includes(currentMatchId) && !scoringScreen.classList.contains('hidden')) {
+                        showToast("Session expired due to inactivity", "warning");
+                        setTimeout(() => location.reload(), 2000);
+                    }
+                    
+                    activeMatchData = null;
                     resumeContainer.classList.add('hidden');
                 }
             } catch (err) { 
