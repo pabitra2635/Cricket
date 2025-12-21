@@ -1449,16 +1449,44 @@
         }
 
         function renderBalls(container, totalBalls, ballsList) {
-            container.innerHTML = ''; let currentOverBalls = [];
-            if (totalBalls > 0 || ballsList.length > 0) {
-                const legalBallsToSkip = Math.floor((totalBalls - 0.1) / 6) * 6;
-                let legalCount = 0; let startIndex = 0;
+            container.innerHTML = ''; 
+            let currentOverBalls = [];
+            
+            if (ballsList.length > 0) {
+                let legalBallsToSkip = 0;
+                
+                // Calculate where the current over started based on legal balls count
+                if (totalBalls > 0 && totalBalls % 6 === 0) {
+                    const lastBall = ballsList[ballsList.length - 1];
+                    // Check if last ball was extra. If so, we are in the NEXT over (e.g. 0.1), so skip previous completed overs.
+                    // If last ball was legal, we are at End of Over (e.g. 1.0), so show that completed over.
+                    const isLastBallExtra = lastBall === 'WD' || lastBall === 'NB' || (typeof lastBall === 'string' && lastBall.startsWith('NB'));
+                    
+                    if (isLastBallExtra) {
+                        legalBallsToSkip = totalBalls;
+                    } else {
+                        legalBallsToSkip = totalBalls - 6;
+                    }
+                } else {
+                    // Mid-over or start of innings
+                    legalBallsToSkip = Math.floor(totalBalls / 6) * 6;
+                }
+
+                let legalCount = 0; 
+                let startIndex = 0;
+                
                 for (let i = 0; i < ballsList.length; i++) {
-                    if (legalCount >= legalBallsToSkip) { startIndex = i; break; }
-                    if (ballsList[i] !== 'WD' && ballsList[i] !== 'NB') legalCount++;
+                    if (legalCount >= legalBallsToSkip) { 
+                        startIndex = i; 
+                        break; 
+                    }
+                    const b = ballsList[i];
+                    const isExtra = b === 'WD' || b === 'NB' || (typeof b === 'string' && b.startsWith('NB'));
+                    if (!isExtra) legalCount++;
                 }
                 currentOverBalls = ballsList.slice(startIndex);
             }
+
             currentOverBalls.forEach(ball => {
                 const span = document.createElement('span');
                 span.className = 'ball-dot ' + getBallColor(ball);
