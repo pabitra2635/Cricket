@@ -6,6 +6,8 @@
     <title>Gully Cricket Live Scorer</title>
     <link rel="icon" href="https://mgcub.ac.in/images/rotate.png" type="image/png">
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- html2canvas for Screenshot -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style type="text/tailwindcss">
         /* Updated Ball Design */
         .ball-dot { 
@@ -461,17 +463,38 @@
         </div>
 
         <!-- Result Screen -->
-        <div id="result-screen" class="hidden p-8 text-center flex-grow flex flex-col justify-center">
-            <div id="result-emoji" class="text-6xl mb-4">🏆</div>
-            <h2 id="result-header" class="text-2xl font-black text-gray-800 mb-2 uppercase">Match Finished!</h2>
-            <p id="winner-text" class="text-xl font-bold text-[#F7631B] mb-6"></p>
-            <div id="final-stats" class="bg-gray-100 p-4 rounded-lg mb-4 text-left space-y-2 text-sm"></div>
+        <div id="result-screen" class="hidden p-6 flex-grow flex flex-col justify-center">
             
+            <!-- Capture Area Wrapper -->
+            <div id="scorecard-capture" class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 mb-6 relative overflow-hidden">
+                <!-- Branding Line -->
+                <div class="absolute top-0 left-0 w-full h-1.5 bg-[#F7631B]"></div>
+                
+                <div class="text-center mt-2">
+                    <div id="result-emoji" class="text-6xl mb-4 transform hover:scale-110 transition-transform">🏆</div>
+                    <h2 id="result-header" class="text-2xl font-black text-gray-800 mb-2 uppercase tracking-tight">Match Finished!</h2>
+                    <p id="winner-text" class="text-xl font-bold text-[#F7631B] mb-6"></p>
+                </div>
+                
+                <div id="final-stats" class="bg-gray-50 p-4 rounded-xl mb-4 text-left space-y-2 text-sm border border-gray-100"></div>
+                
+                <div class="text-center mt-6">
+                    <p class="text-[10px] text-gray-300 font-bold uppercase tracking-[0.2em]">Gully Premier League</p>
+                </div>
+            </div>
+            
+            <button onclick="downloadScorecard()" class="w-full bg-gray-800 hover:bg-gray-900 text-white py-4 rounded-xl font-bold uppercase shadow-lg transition-transform active:scale-95 mb-3 flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Save Card
+            </button>
+
             <button onclick="shareCurrentMatch()" class="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-bold uppercase shadow-lg transition-transform active:scale-95 mb-3 flex items-center justify-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                 </svg>
-                Share Result
+                Share Link
             </button>
             
             <button onclick="location.reload()" class="w-full bg-brand-primary text-white py-4 rounded-xl font-bold uppercase shadow-lg transition-transform active:scale-95">New Match</button>
@@ -620,6 +643,24 @@
             return match.playerStats[name];
         }
 
+        // --- MOTM Calculation ---
+        function calculateMOTM(stats) {
+            let bestPlayer = null;
+            let maxPoints = -1;
+
+            Object.keys(stats).forEach(name => {
+                const p = stats[name];
+                // Logic: 1 Run = 1 Pt, 1 Wicket = 20 Pts
+                let points = (p.runs || 0) * 1 + (p.wickets || 0) * 20;
+                
+                if (points > maxPoints) {
+                    maxPoints = points;
+                    bestPlayer = { name, points, runs: p.runs || 0, wickets: p.wickets || 0 };
+                }
+            });
+            return bestPlayer;
+        }
+
         // --- Player Edit System ---
         window.openPlayerModal = function(role) {
             currentEditRole = role;
@@ -648,6 +689,28 @@
             } else {
                 showToast("Name cannot be empty", "error");
             }
+        };
+
+        window.downloadScorecard = function() {
+            const captureElement = document.getElementById('scorecard-capture');
+            if (!captureElement) return;
+
+            showToast("Generating Image...", "info");
+
+            html2canvas(captureElement, {
+                scale: 2, // High resolution
+                useCORS: true,
+                backgroundColor: "#ffffff"
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `GullyCricket_Scorecard_${Date.now()}.png`;
+                link.href = canvas.toDataURL();
+                link.click();
+                showToast("Image Downloaded!", "success");
+            }).catch(err => {
+                console.error("Capture failed:", err);
+                showToast("Failed to generate image", "error");
+            });
         };
 
         window.submitInitialPlayers = async function() {
@@ -1435,6 +1498,23 @@
             const sTime = match.startTime ? new Date(match.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--';
             const eTime = match.endTime ? new Date(match.endTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--';
 
+            // Calculate MOTM
+            const motm = calculateMOTM(match.playerStats);
+            let motmHtml = '';
+            if (motm) {
+                motmHtml = `
+                    <div class="mt-4 bg-gradient-to-br from-yellow-50 to-orange-100 border border-orange-200 rounded-xl p-4 shadow-sm relative overflow-hidden">
+                        <div class="absolute top-0 right-0 -mt-2 -mr-2 text-yellow-300 opacity-50 text-6xl">★</div>
+                        <p class="text-[10px] font-black uppercase text-orange-500 tracking-widest mb-1">Man of the Match</p>
+                        <p class="text-xl font-black text-gray-800">${motm.name}</p>
+                        <p class="text-xs font-bold text-gray-600 mt-1">
+                            ${motm.runs} Runs • ${motm.wickets} Wickets
+                            <span class="ml-2 text-orange-600 bg-orange-200 px-1.5 py-0.5 rounded text-[10px]">${motm.points} Pts</span>
+                        </p>
+                    </div>
+                `;
+            }
+
             document.getElementById('final-stats').innerHTML = `
                 <div class="grid grid-cols-2 gap-2 mb-4">
                     <div class="bg-gray-50 p-2 rounded">
@@ -1447,7 +1527,8 @@
                     </div>
                 </div>
                 <p class="font-bold">Final Score: ${match.runs}/${match.wickets} in ${formatOvers(match.balls)} overs</p>
-                <p class="text-[10px] text-gray-400 uppercase mt-2">Played with ${match.playerCount} players per team</p>
+                <p class="text-[10px] text-gray-400 uppercase mt-1">Played with ${match.playerCount} players per team</p>
+                ${motmHtml}
             `;
             syncToCloud();
             showToast("Match Finished - Summary Generated", "success");
@@ -1854,11 +1935,25 @@
             // --- Generate Full Scorecard with Result Banner ---
             let resultBanner = '';
             if (data.status === "Finished") {
+                // Calculate MOTM for viewer
+                const motm = calculateMOTM(data.playerStats || {});
+                let motmBadge = '';
+                if (motm) {
+                    motmBadge = `
+                        <div class="mt-3 bg-white/60 rounded-lg p-2 inline-block border border-orange-200">
+                            <span class="text-[10px] font-bold text-orange-600 uppercase block tracking-wider">Man of the Match</span>
+                            <span class="font-black text-gray-800">${motm.name}</span>
+                            <span class="text-[10px] text-gray-600 block">(${motm.runs} R, ${motm.wickets} W)</span>
+                        </div>
+                    `;
+                }
+
                 resultBanner = `
                     <div class="bg-gradient-to-r from-orange-50 to-orange-100 border border-orange-200 p-4 rounded-xl text-center mb-4">
                         <div class="text-4xl mb-2">🏆</div>
                         <h3 class="text-lg font-black text-gray-800 uppercase tracking-tight">Match Finished</h3>
                         <p class="text-xl font-bold text-[#F7631B] mt-1">${data.result || 'Result Declared'}</p>
+                        ${motmBadge}
                     </div>
                 `;
             }
