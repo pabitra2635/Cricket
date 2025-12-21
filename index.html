@@ -1024,7 +1024,14 @@
                     }
 
                     const diffMinutes = (now - lastActiveTime) / 1000 / 60;
-                    return diffMinutes > 30;
+                    
+                    // Rules: 
+                    // 1. Live match -> Abandon after 30 mins
+                    // 2. On Break match -> Abandon after 2 days (2880 mins)
+                    if (m.status === 'Live' && diffMinutes > 30) return true;
+                    if (m.status === 'On Break' && diffMinutes > 2880) return true; 
+
+                    return false;
                 });
 
                 // Update stale matches to Abandoned
