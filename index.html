@@ -37,8 +37,8 @@
 </head>
 <body class="bg-gray-100 min-h-screen font-sans text-gray-900">
 
-    <!-- Increased max-width from max-w-md to max-w-lg -->
-    <div id="app" class="max-w-lg mx-auto bg-white min-h-screen shadow-lg flex flex-col relative">
+    <!-- Increased max-width from max-w-lg to max-w-xl for more space -->
+    <div id="app" class="max-w-xl mx-auto bg-white min-h-screen shadow-lg flex flex-col relative">
         
         <!-- Header -->
         <header class="bg-brand-primary text-white p-4 shadow-md sticky top-0 z-50">
@@ -338,9 +338,10 @@
 
         <!-- Viewer Screen -->
         <div id="viewer-screen" class="hidden flex-grow flex flex-col relative overflow-y-auto">
-             <div class="bg-gray-900 text-white p-4 text-center sticky top-0 z-10 shadow-lg">
+             <!-- Reduced horizontal padding from p-4 to px-2 py-4 to give more width to control bar -->
+             <div class="bg-gray-900 text-white px-2 py-4 text-center sticky top-0 z-10 shadow-lg">
                 <!-- Header with Teams, Target and Share -->
-                <div class="flex justify-between items-center mb-4">
+                <div class="flex justify-between items-center mb-4 px-2">
                     <span id="v-display-teams" class="text-xs font-bold text-gray-400 uppercase tracking-widest text-left">Loading...</span>
                     <div class="flex items-center gap-2">
                          <span id="v-display-target" class="text-xs text-[#F7631B] font-bold hidden uppercase whitespace-nowrap">TARGET: 0</span>
@@ -420,9 +421,10 @@
 
         <!-- Scoring Screen -->
         <div id="scoring-screen" class="hidden flex-grow flex flex-col relative">
-            <div class="bg-gray-900 text-white p-4 text-center">
+            <!-- Reduced horizontal padding from p-4 to px-2 py-4 to give more width to control bar -->
+            <div class="bg-gray-900 text-white px-2 py-4 text-center">
                 <!-- Header with Teams, Target and Share -->
-                <div class="flex justify-between items-center mb-4">
+                <div class="flex justify-between items-center mb-4 px-2">
                     <span id="display-teams" class="text-xs font-bold text-gray-400 uppercase tracking-widest text-left">Loading...</span>
                     <div class="flex items-center gap-2">
                          <span id="display-target" class="text-xs text-[#F7631B] font-bold hidden uppercase whitespace-nowrap">TARGET: 0</span>
