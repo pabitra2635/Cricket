@@ -535,6 +535,36 @@
 
         <!-- Toast Container -->
         <div id="toast-container" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 w-full max-w-xs px-4 pointer-events-none"></div>
+
+        <!-- Hidden Share Card Template (For Image Generation) -->
+        <div id="hidden-share-card" class="fixed top-0 left-[-9999px] w-[400px] bg-white p-8 rounded-3xl shadow-2xl border border-gray-100 overflow-hidden z-[-1]">
+            <!-- Branding Line -->
+            <div class="absolute top-0 left-0 w-full h-2 bg-[#F7631B]"></div>
+            <div class="text-center mt-2">
+                <div class="flex items-center justify-center gap-2 mb-4">
+                    <span class="text-2xl">🏏</span>
+                    <h2 class="text-xl font-black text-gray-800 uppercase tracking-tight" id="share-card-header">Live Update</h2>
+                    <span class="text-2xl">⚾</span>
+                </div>
+                
+                <p id="share-card-teams" class="text-lg font-bold text-gray-600 mb-6 bg-gray-50 py-2 rounded-lg mx-4">Team A vs Team B</p>
+                
+                <div class="text-6xl font-black text-[#F7631B] mb-2 flex justify-center items-end leading-none">
+                    <span id="share-card-score">0/0</span>
+                </div>
+                <p class="text-xl font-bold text-gray-400 mb-6">
+                    Overs: <span id="share-card-overs" class="text-gray-600">0.0</span>
+                </p>
+                
+                <div id="share-card-status" class="bg-gradient-to-r from-orange-50 to-orange-100 border border-orange-200 p-4 rounded-xl text-base text-gray-800 font-bold mb-6 mx-4">
+                    <!-- Status text -->
+                </div>
+
+                <div class="text-center mt-2 border-t border-gray-100 pt-4">
+                    <p class="text-[10px] text-gray-400 font-bold uppercase tracking-[0.3em]">Gully Premier League</p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Firebase SDKs -->
@@ -825,11 +855,13 @@
         window.shareCurrentMatch = async function() {
             let idToShare = null;
             let data = null;
+            let isViewer = false;
 
             // Determine context and data
             if (!document.getElementById('viewer-screen').classList.contains('hidden')) {
                 idToShare = activeViewerMatchId;
                 data = viewerMatchData;
+                isViewer = true;
             } else if (!document.getElementById('scoring-screen').classList.contains('hidden')) {
                 idToShare = currentMatchId;
                 data = match;
@@ -850,32 +882,69 @@
 
             // Construct Status Message
             const overs = Math.floor(data.balls / 6) + "." + (data.balls % 6);
-            let statusMsg = "Live";
-            let actionText = "Watch Live Scoring:";
+            let statusMsg = "Live Match";
+            let headerText = "Live Update";
             
             if (data.result) {
                 statusMsg = "Result: " + data.result;
-                actionText = "See Match Summary:";
+                headerText = "Match Result";
             }
-            else if (data.isAbandoned) statusMsg = "Abandoned";
-            else if (data.isOnBreak) statusMsg = "Break";
+            else if (data.isAbandoned) {
+                statusMsg = "Match Abandoned";
+                headerText = "Abandoned";
+            }
+            else if (data.isOnBreak) statusMsg = "Match on Break";
             else if (data.target) {
                 const runsNeeded = data.target - data.runs;
                 const ballsLeft = (data.maxOvers * 6) - data.balls;
                 statusMsg = `Target ${data.target} | Need ${runsNeeded} off ${ballsLeft} balls`;
             }
 
-            const title = data.result ? "Match Result" : "Live Cricket Score";
-            const text = `🏏 ${data.battingTeam} vs ${data.bowlingTeam} ⚾\nScore: ${data.runs}/${data.wickets} (${overs} Overs)\n${statusMsg}\n\n${actionText}`;
+            const title = "Gully Cricket Score";
+            const text = `🏏 ${data.battingTeam} vs ${data.bowlingTeam} ⚾\nScore: ${data.runs}/${data.wickets} (${overs})\n${statusMsg}\n\nLink:`;
+
+            // Image Generation Logic
+            let file = null;
+            // Generate image if in Viewer or Result screen
+            if (isViewer || !document.getElementById('result-screen').classList.contains('hidden')) {
+                try {
+                    showToast("Generating Image...", "info");
+                    
+                    // Populate Hidden Card
+                    const card = document.getElementById('hidden-share-card');
+                    document.getElementById('share-card-header').innerText = headerText;
+                    document.getElementById('share-card-teams').innerText = `${data.battingTeam} vs ${data.bowlingTeam}`;
+                    document.getElementById('share-card-score').innerText = `${data.runs}/${data.wickets}`;
+                    document.getElementById('share-card-overs').innerText = `${overs} / ${data.maxOvers}`;
+                    document.getElementById('share-card-status').innerText = statusMsg;
+                    
+                    // Wait a moment for DOM to update
+                    await new Promise(r => setTimeout(r, 100));
+                    
+                    const canvas = await html2canvas(card, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+                    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                    file = new File([blob], "cricket_score.png", { type: "image/png" });
+                } catch (e) {
+                    console.error("Image gen failed", e);
+                    showToast("Could not generate image", "warning");
+                }
+            }
 
             // Native Share with Fallback
             if (navigator.share) {
                 try {
-                    await navigator.share({
+                    const shareData = {
                         title: title,
                         text: text,
                         url: shareUrl
-                    });
+                    };
+                    
+                    // Attach file if available and supported
+                    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+                        shareData.files = [file];
+                    }
+                    
+                    await navigator.share(shareData);
                 } catch (err) {
                     console.log("Share canceled or failed", err);
                 }
