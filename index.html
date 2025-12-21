@@ -140,6 +140,9 @@
         <div id="initial-players-modal" class="hidden fixed inset-0 z-[95] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-black/80 backdrop-blur-sm"></div>
             <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 modal-enter">
+                <button onclick="document.getElementById('initial-players-modal').classList.add('hidden'); document.getElementById('setup-screen').classList.remove('hidden');" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
                 <h3 class="text-lg font-black text-gray-800 mb-4 uppercase">Match Starters</h3>
                 <div class="space-y-3">
                     <div>
@@ -163,6 +166,9 @@
         <div id="new-batsman-modal" class="hidden fixed inset-0 z-[95] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-black/80 backdrop-blur-sm"></div>
             <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 modal-enter">
+                <button onclick="document.getElementById('new-batsman-modal').classList.add('hidden')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
                 <div class="text-center mb-4">
                     <div class="text-4xl mb-2">☝️</div>
                     <h3 class="text-lg font-black text-gray-800 uppercase">Wicket Fall!</h3>
@@ -205,6 +211,9 @@
         <div id="nb-runs-modal" class="hidden fixed inset-0 z-[95] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="document.getElementById('nb-runs-modal').classList.add('hidden')"></div>
             <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 modal-enter text-center">
+                <button onclick="document.getElementById('nb-runs-modal').classList.add('hidden')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
                 <h3 class="text-lg font-black text-gray-800 mb-2 uppercase">No Ball</h3>
                 <p class="text-sm text-gray-500 mb-4">Runs scored off the bat?</p>
                 <div class="grid grid-cols-3 gap-3">
@@ -215,7 +224,6 @@
                     <button onclick="confirmNoBall(4)" class="p-3 bg-orange-100 text-orange-600 rounded-xl font-bold hover:bg-orange-200">4</button>
                     <button onclick="confirmNoBall(6)" class="p-3 bg-orange-600 text-white rounded-xl font-bold hover:bg-orange-700">6</button>
                 </div>
-                <button onclick="document.getElementById('nb-runs-modal').classList.add('hidden')" class="mt-4 text-xs font-bold text-gray-400 uppercase hover:text-gray-600">Cancel</button>
             </div>
         </div>
 
@@ -223,17 +231,17 @@
         <div id="toss-modal" class="hidden fixed inset-0 z-[90] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onclick="closeTossModal()"></div>
             <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center overflow-hidden modal-enter">
-                <button onclick="closeTossModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                <button onclick="closeTossModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
                 <h3 class="text-xl font-black text-gray-800 uppercase tracking-tight mb-6">Coin Toss</h3>
                 
                 <!-- Coin Container -->
                 <div class="h-32 mb-8 flex justify-center perspective-1000">
-                     <div id="coin" class="w-32 h-32 relative transform-style-3d transition-transform duration-[3000ms]">
+                      <div id="coin" class="w-32 h-32 relative transform-style-3d transition-transform duration-[3000ms]">
                         <div class="absolute inset-0 rounded-full bg-yellow-400 border-4 border-yellow-600 flex items-center justify-center text-3xl font-bold text-yellow-800 shadow-inner backface-hidden">H</div>
                         <div class="absolute inset-0 rounded-full bg-gray-200 border-4 border-gray-400 flex items-center justify-center text-3xl font-bold text-gray-700 shadow-inner backface-hidden rotate-y-180">T</div>
-                     </div>
+                      </div>
                 </div>
 
                 <!-- Step 1: Flip -->
@@ -481,6 +489,9 @@
         <div id="confirm-modal" class="hidden fixed inset-0 z-[80] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"></div>
             <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all scale-100 animate-in fade-in zoom-in duration-200">
+                <button onclick="document.getElementById('confirm-cancel-btn').click()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
                 <div class="p-6 text-center">
                     <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-orange-100 mb-4">
                         <svg class="h-6 w-6 text-[#F7631B]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -501,6 +512,9 @@
         <div id="player-modal" class="hidden fixed inset-0 z-[85] flex items-center justify-center p-4">
              <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onclick="document.getElementById('player-modal').classList.add('hidden')"></div>
              <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden p-6 modal-enter">
+                 <button onclick="document.getElementById('player-modal').classList.add('hidden')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                 </button>
                   <h3 id="player-modal-title" class="text-lg font-black uppercase text-gray-800 mb-4">Update Player</h3>
                   <input type="text" id="player-name-input" class="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-[#F7631B] outline-none font-bold mb-4" placeholder="Enter Name">
                   <div class="flex gap-3">
@@ -705,6 +719,19 @@
             document.getElementById('new-batsman-name').value = '';
             updateDisplay();
             await syncToCloud();
+        };
+
+        window.handleBowlerModalClose = function() {
+            const existing = document.getElementById('existing-bowler-select').value;
+            const newName = document.getElementById('new-bowler-name').value.trim();
+            
+            // If user selected or typed something, save it
+            if (existing || newName) {
+                submitNextBowler();
+            } else {
+                // Otherwise just close (keeping current bowler)
+                document.getElementById('next-bowler-modal').classList.add('hidden');
+            }
         };
 
         window.submitNextBowler = async function() {
@@ -1958,17 +1985,17 @@
                     </h4>`;
                 
                 if (team.wickets.length > 0) {
-                     let wHtml = '';
-                     team.wickets.forEach(p => {
+                      let wHtml = '';
+                      team.wickets.forEach(p => {
                         wHtml += `
                         <div class="flex justify-between items-center text-xs text-gray-700 py-1.5 border-b border-dashed border-gray-100 last:border-0">
                             <span class="font-bold">${p.name}</span>
                             <span class="font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-600">${p.runs} <span class="text-[9px]">(${p.balls})</span></span>
                         </div>`;
-                     });
-                     teamHtml += `<div class="pl-1">${wHtml}</div>`;
+                      });
+                      teamHtml += `<div class="pl-1">${wHtml}</div>`;
                 } else {
-                     teamHtml += `<p class="text-[10px] text-gray-400 italic pl-1">No wickets yet.</p>`;
+                      teamHtml += `<p class="text-[10px] text-gray-400 italic pl-1">No wickets yet.</p>`;
                 }
                 teamHtml += `</div>`;
 
@@ -1979,22 +2006,22 @@
                     </h4>`;
                 
                 if (team.bowlers.length > 0) {
-                     let bHtml = `
+                      let bHtml = `
                         <div class="flex justify-between text-[9px] uppercase text-gray-400 font-bold mb-2 pl-1">
                             <span>Bowler</span>
                             <span>O-M-R-W</span>
                         </div>`;
-                     team.bowlers.forEach(p => {
+                      team.bowlers.forEach(p => {
                         // Note: M (Maidens) not tracked currently, using O-R-W format or standard
                         bHtml += `
                         <div class="flex justify-between items-center text-xs text-gray-700 py-1.5 border-b border-dashed border-gray-100 last:border-0 pl-1">
                             <span class="font-bold">${p.name}</span>
                             <span class="font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-600">${formatOvers(p.ballsBowled)} - ${p.runsConceded} - ${p.wickets}</span>
                         </div>`;
-                     });
-                     teamHtml += `<div>${bHtml}</div>`;
+                      });
+                      teamHtml += `<div>${bHtml}</div>`;
                 } else {
-                     teamHtml += `<p class="text-[10px] text-gray-400 italic pl-1">No bowling stats.</p>`;
+                      teamHtml += `<p class="text-[10px] text-gray-400 italic pl-1">No bowling stats.</p>`;
                 }
                 teamHtml += `</div>`; // End Bowling section
 
