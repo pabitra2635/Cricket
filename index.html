@@ -987,13 +987,18 @@
                 try {
                     const shareData = {
                         title: title,
-                        text: text,
-                        url: shareUrl
+                        text: text
                     };
                     
                     // Attach file if available and supported
                     if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
                         shareData.files = [file];
+                        // Important: When sharing files, do NOT set 'url' separately. 
+                        // Many apps/OSs drop the text/caption if both file and url are present.
+                        // The URL is already inside 'text'.
+                    } else {
+                        // If no file, we can safely add the URL field
+                        shareData.url = shareUrl;
                     }
                     
                     await navigator.share(shareData);
