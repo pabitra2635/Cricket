@@ -538,32 +538,23 @@
         <div id="toast-container" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 w-full max-w-xs px-4 pointer-events-none"></div>
 
         <!-- Hidden Share Card Template (For Image Generation) -->
-        <div id="hidden-share-card" class="fixed top-0 left-[-9999px] w-[400px] bg-white p-8 rounded-3xl shadow-2xl border border-gray-100 overflow-hidden z-[-1]">
+        <div id="hidden-share-card" class="fixed top-0 left-[-9999px] w-[400px] bg-white p-6 rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-[-1]">
             <!-- Branding Line -->
-            <div class="absolute top-0 left-0 w-full h-2 bg-[#F7631B]"></div>
+            <div class="absolute top-0 left-0 w-full h-1.5 bg-[#F7631B]"></div>
+            
             <div class="text-center mt-2">
-                <div class="flex items-center justify-center gap-2 mb-4">
-                    <span class="text-2xl">🏏</span>
-                    <h2 class="text-xl font-black text-gray-800 uppercase tracking-tight" id="share-card-header">Live Update</h2>
-                    <span class="text-2xl">⚾</span>
-                </div>
-                
-                <p id="share-card-teams" class="text-lg font-bold text-gray-600 mb-6 bg-gray-50 py-2 rounded-lg mx-4">Team A vs Team B</p>
-                
-                <div class="text-6xl font-black text-[#F7631B] mb-2 flex justify-center items-end leading-none">
-                    <span id="share-card-score">0/0</span>
-                </div>
-                <p class="text-xl font-bold text-gray-400 mb-6">
-                    Overs: <span id="share-card-overs" class="text-gray-600">0.0</span>
-                </p>
-                
-                <div id="share-card-status" class="bg-gradient-to-r from-orange-50 to-orange-100 border border-orange-200 p-4 rounded-xl text-base text-gray-800 font-bold mb-6 mx-4">
-                    <!-- Status text -->
-                </div>
-
-                <div class="text-center mt-2 border-t border-gray-100 pt-4">
-                    <p class="text-[10px] text-gray-400 font-bold uppercase tracking-[0.3em]">Gully Premier League</p>
-                </div>
+                <div id="share-card-emoji" class="text-6xl mb-4">🏆</div>
+                <h2 id="share-card-header" class="text-2xl font-black text-gray-800 uppercase tracking-tight leading-none">Match Finished!</h2>
+                <p id="share-card-teams" class="text-sm font-bold text-gray-500 uppercase tracking-wider mt-1 mb-2">Team A vs Team B</p>
+                <p id="share-card-main-text" class="text-xl font-bold text-[#F7631B] mb-6">Winner Text</p>
+            </div>
+            
+            <div id="share-card-stats" class="bg-gray-50 p-4 rounded-xl mb-4 text-left space-y-2 text-sm border border-gray-100">
+                <!-- Stats Content Injected Here -->
+            </div>
+            
+            <div class="text-center mt-6">
+                <p class="text-[10px] text-gray-300 font-bold uppercase tracking-[0.2em]">Gully Premier League</p>
             </div>
         </div>
     </div>
@@ -888,7 +879,7 @@
             
             if (data.result) {
                 statusMsg = "Result: " + data.result;
-                headerText = "Match Result";
+                headerText = "Match Finished!";
             }
             else if (data.isAbandoned) {
                 statusMsg = "Match Abandoned";
@@ -902,7 +893,8 @@
             }
 
             const title = "Gully Cricket Score";
-            const text = `🏏 ${data.battingTeam} vs ${data.bowlingTeam} ⚾\nScore: ${data.runs}/${data.wickets} (${overs})\n${statusMsg}\n\nLink:`;
+            // Included shareUrl directly in text for better compatibility with images
+            const text = `🏏 ${data.battingTeam} vs ${data.bowlingTeam} ⚾\nScore: ${data.runs}/${data.wickets} (${overs})\n${statusMsg}\n\nLink: ${shareUrl}`;
 
             // Image Generation Logic
             let file = null;
@@ -911,13 +903,92 @@
                 try {
                     showToast("Generating Image...", "info");
                     
-                    // Populate Hidden Card
+                    // Populate Hidden Card to match Result Card Style
                     const card = document.getElementById('hidden-share-card');
+                    
+                    // 1. Emoji & Header
+                    let emoji = "🔴";
+                    if (data.result) emoji = "🏆";
+                    else if (data.isAbandoned) emoji = "☁️";
+                    else if (data.isOnBreak) emoji = "⏸️";
+                    
+                    document.getElementById('share-card-emoji').innerText = emoji;
                     document.getElementById('share-card-header').innerText = headerText;
+                    
+                    // 2. Teams
                     document.getElementById('share-card-teams').innerText = `${data.battingTeam} vs ${data.bowlingTeam}`;
-                    document.getElementById('share-card-score').innerText = `${data.runs}/${data.wickets}`;
-                    document.getElementById('share-card-overs').innerText = `${overs} / ${data.maxOvers}`;
-                    document.getElementById('share-card-status').innerText = statusMsg;
+                    
+                    // 3. Main Text (Status/Result)
+                    const mainTextEl = document.getElementById('share-card-main-text');
+                    mainTextEl.innerText = data.result || statusMsg; // Use result string if finished
+                    
+                    // Adjust color based on state
+                    if (data.result) mainTextEl.className = "text-xl font-bold text-[#F7631B] mb-6";
+                    else mainTextEl.className = "text-xl font-bold text-gray-700 mb-6";
+
+                    // 4. Stats Container (Grid)
+                    const statsContainer = document.getElementById('share-card-stats');
+                    
+                    // Format score line
+                    const scoreLine = `<p class="font-bold text-lg text-gray-800 text-center mt-2 border-t border-gray-100 pt-2">Score: ${data.runs}/${data.wickets} <span class="text-sm font-normal text-gray-500">(${overs} ov)</span></p>`;
+                    
+                    // Grid Content
+                    let gridHtml = '';
+                    
+                    if (data.result || data.isAbandoned) {
+                        // Result Style Grid
+                        const sTime = data.startTime ? new Date(data.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--';
+                        const eTime = data.endTime ? new Date(data.endTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--';
+                        
+                        gridHtml = `
+                            <div class="grid grid-cols-2 gap-2 mb-2">
+                                <div class="bg-white p-2 rounded border border-gray-100">
+                                    <p class="text-[10px] uppercase text-gray-400 font-bold">Start</p>
+                                    <p class="text-sm font-bold text-gray-700">${sTime}</p>
+                                </div>
+                                <div class="bg-white p-2 rounded border border-gray-100">
+                                    <p class="text-[10px] uppercase text-gray-400 font-bold">End</p>
+                                    <p class="text-sm font-bold text-gray-700">${eTime}</p>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        // Live Style Grid
+                        const crr = data.balls > 0 ? (data.runs / (data.balls / 6)).toFixed(2) : "0.00";
+                        const ballsLeft = (data.maxOvers * 6) - data.balls;
+                        const req = (data.target && ballsLeft > 0) ? ( ((data.target - data.runs) / (ballsLeft / 6)).toFixed(2) ) : "-";
+                        
+                        gridHtml = `
+                            <div class="grid grid-cols-2 gap-2 mb-2">
+                                <div class="bg-white p-2 rounded border border-gray-100">
+                                    <p class="text-[10px] uppercase text-gray-400 font-bold">Run Rate</p>
+                                    <p class="text-sm font-bold text-gray-700">${crr}</p>
+                                </div>
+                                <div class="bg-white p-2 rounded border border-gray-100">
+                                    <p class="text-[10px] uppercase text-gray-400 font-bold">Target / Req</p>
+                                    <p class="text-sm font-bold text-gray-700">${data.target || '-'} <span class="text-xs text-gray-400 font-normal">(${req})</span></p>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    statsContainer.innerHTML = gridHtml + scoreLine;
+
+                    // 5. MOTM (if exists & finished)
+                    if (data.result) {
+                         const motm = calculateMOTM(data.playerStats || {});
+                         if (motm) {
+                             statsContainer.innerHTML += `
+                                <div class="mt-2 pt-2 border-t border-dashed border-gray-200">
+                                    <p class="text-[10px] font-black uppercase text-orange-500 tracking-widest mb-1">Man of the Match</p>
+                                    <div class="flex justify-between items-center">
+                                        <p class="text-sm font-black text-gray-800">${motm.name}</p>
+                                        <span class="text-[10px] bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-bold">${motm.points} Pts</span>
+                                    </div>
+                                </div>
+                             `;
+                         }
+                    }
                     
                     // Wait a moment for DOM to update
                     await new Promise(r => setTimeout(r, 100));
@@ -951,14 +1022,14 @@
                 }
             } else {
                 // Clipboard Fallback for desktops/iframe restrictions
-                const fullMsg = `${text} ${shareUrl}`;
+                // Note: We use 'text' here which now already contains the URL, so no need to append it again.
                 try {
-                    await navigator.clipboard.writeText(fullMsg);
+                    await navigator.clipboard.writeText(text);
                     showToast("Match Status & Link Copied!", "success");
                 } catch (err) {
                     // Legacy Fallback
                     const textArea = document.createElement("textarea");
-                    textArea.value = fullMsg;
+                    textArea.value = text;
                     document.body.appendChild(textArea);
                     textArea.select();
                     try {
