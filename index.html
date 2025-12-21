@@ -590,10 +590,11 @@
         };
 
         // --- Stats Helper ---
-        function getStats(name) {
+        function getStats(name, team) {
             if (!match.playerStats[name]) {
-                match.playerStats[name] = { runs: 0, balls: 0, wickets: 0, runsConceded: 0, ballsBowled: 0 };
+                match.playerStats[name] = { runs: 0, balls: 0, wickets: 0, runsConceded: 0, ballsBowled: 0, team: team || '' };
             }
+            if (team && !match.playerStats[name].team) match.playerStats[name].team = team;
             return match.playerStats[name];
         }
 
@@ -704,12 +705,12 @@
             match.overHistory.push(notation);
             
             // Stats - Bowler
-            const bStats = getStats(match.bowler);
+            const bStats = getStats(match.bowler, match.bowlingTeam);
             bStats.runsConceded += totalRuns;
             // Note: ballsBowled does NOT increment for NB (illegal delivery)
             
             // Stats - Striker
-            const sStats = getStats(match.striker);
+            const sStats = getStats(match.striker, match.battingTeam);
             sStats.runs += batRuns;
             sStats.balls += 1; // Count NB as ball faced for batsman stats
             
@@ -1226,10 +1227,10 @@
             match.runs += r; match.balls++; match.overHistory.push(r);
             
             // --- Stats Update ---
-            const sStats = getStats(match.striker);
+            const sStats = getStats(match.striker, match.battingTeam);
             sStats.runs += r; sStats.balls += 1;
             
-            const bStats = getStats(match.bowler);
+            const bStats = getStats(match.bowler, match.bowlingTeam);
             bStats.runsConceded += r; bStats.ballsBowled += 1;
             // --------------------
 
@@ -1265,7 +1266,7 @@
             match.runs += 1; match.overHistory.push(type);
             
             // --- Stats Update ---
-            const bStats = getStats(match.bowler);
+            const bStats = getStats(match.bowler, match.bowlingTeam);
             bStats.runsConceded += 1;
             // --------------------
 
@@ -1278,11 +1279,11 @@
             match.wickets++; match.balls++; match.overHistory.push('W');
             
             // --- Stats Update ---
-            const sStats = getStats(match.striker);
+            const sStats = getStats(match.striker, match.battingTeam);
             sStats.balls += 1;
             sStats.isOut = true; // Mark as out
             
-            const bStats = getStats(match.bowler);
+            const bStats = getStats(match.bowler, match.bowlingTeam);
             bStats.wickets += 1; bStats.ballsBowled += 1;
             // --------------------
 
@@ -1415,9 +1416,9 @@
             document.getElementById('limit').innerText = match.maxOvers;
             
             // --- Update Player Stats Display ---
-            const sStats = getStats(match.striker);
-            const nsStats = getStats(match.nonStriker);
-            const bStats = getStats(match.bowler);
+            const sStats = getStats(match.striker, match.battingTeam);
+            const nsStats = getStats(match.nonStriker, match.battingTeam);
+            const bStats = getStats(match.bowler, match.bowlingTeam);
             
             document.getElementById('label-striker').innerText = `${match.striker} (${sStats.runs} off ${sStats.balls})`;
             document.getElementById('label-nonStriker').innerText = `${match.nonStriker} (${nsStats.runs} off ${nsStats.balls})`;
@@ -1691,8 +1692,6 @@
             
             // --- Handle Overlay ---
             const vB = document.getElementById('v-break-overlay');
-            // Only show blocking overlay for Break or Abandoned. 
-            // For Finished, we show the result inline instead.
             if (data.status === "On Break" || data.status === "Abandoned") {
                 vB.classList.remove('hidden');
                 if (data.status === "Abandoned") {
@@ -1722,47 +1721,97 @@
                 `;
             }
 
-            let outBatsmenHtml = '';
-            let bowlersHtml = '';
-            
+            // Group By Team Logic
+            const teamsMap = {};
+            // Ensure current teams exist in map
+            if (data.battingTeam) teamsMap[data.battingTeam] = { name: data.battingTeam, wickets: [], bowlers: [] };
+            if (data.bowlingTeam) teamsMap[data.bowlingTeam] = { name: data.bowlingTeam, wickets: [], bowlers: [] };
+
             Object.keys(stats).forEach(playerName => {
                 const p = stats[playerName];
-                // Batsmen Out
-                if (p.isOut) {
-                    outBatsmenHtml += `
-                        <div class="flex justify-between items-center text-xs text-gray-600 border-b border-gray-200 py-1.5">
-                            <span class="font-bold text-gray-800">${playerName}</span>
-                            <span>${p.runs} <span class="text-[10px] text-gray-400">(${p.balls})</span></span>
-                        </div>
-                    `;
+                let tName = p.team;
+                
+                // Fallback for legacy data/current players if team not set
+                if (!tName) {
+                    if (playerName === data.striker || playerName === data.nonStriker) tName = data.battingTeam;
+                    else if (playerName === data.bowler) tName = data.bowlingTeam;
+                    else tName = 'Other'; 
                 }
-                // Bowlers (Anyone who bowled a legal ball or conceded runs)
-                if (p.ballsBowled > 0 || p.runsConceded > 0) {
-                    bowlersHtml += `
-                        <div class="flex justify-between items-center text-xs text-gray-600 border-b border-gray-200 py-1.5">
-                            <span class="font-bold text-gray-800">${playerName}</span>
-                            <span class="font-mono text-[10px]">${formatOvers(p.ballsBowled)} - ${p.runsConceded} - ${p.wickets}</span>
-                        </div>
-                    `;
-                }
+
+                if (!teamsMap[tName]) teamsMap[tName] = { name: tName, wickets: [], bowlers: [] };
+                
+                if (p.isOut) teamsMap[tName].wickets.push({name: playerName, ...p});
+                if (p.ballsBowled > 0 || p.runsConceded > 0) teamsMap[tName].bowlers.push({name: playerName, ...p});
             });
 
-            const scorecardHtml = `
-                ${resultBanner}
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3">
-                    <h4 class="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2">Fall of Wickets</h4>
-                    ${outBatsmenHtml || '<p class="text-[10px] text-gray-400 italic">No wickets fell yet.</p>'}
-                </div>
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3">
-                    <h4 class="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2">Bowling Card</h4>
-                    <div class="flex justify-between text-[9px] uppercase text-gray-400 font-bold mb-1 border-b pb-1">
-                        <span>Bowler</span>
-                        <span>O - R - W</span>
+            let fullHtml = resultBanner;
+
+            Object.values(teamsMap).forEach(team => {
+                if (team.name === 'Other' && team.wickets.length === 0 && team.bowlers.length === 0) return;
+                
+                // Only show if there is data
+                // Commented out to ensure headers show even if empty
+                // if (team.wickets.length === 0 && team.bowlers.length === 0) return;
+
+                let teamHtml = `<div class="mb-4 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                        <h3 class="font-black text-gray-800 uppercase tracking-wider">${team.name}</h3>
                     </div>
-                    ${bowlersHtml || '<p class="text-[10px] text-gray-400 italic">No bowling stats yet.</p>'}
-                </div>
-            `;
-            document.getElementById('v-full-scorecard').innerHTML = scorecardHtml;
+                    <div class="p-4 space-y-6">`;
+                
+                // Wickets Section
+                teamHtml += `<div>
+                    <h4 class="text-[10px] font-bold text-[#F7631B] uppercase tracking-widest mb-2 flex items-center gap-1">
+                        <span>🏏</span> Fall of Wickets
+                    </h4>`;
+                
+                if (team.wickets.length > 0) {
+                     let wHtml = '';
+                     team.wickets.forEach(p => {
+                        wHtml += `
+                        <div class="flex justify-between items-center text-xs text-gray-700 py-1.5 border-b border-dashed border-gray-100 last:border-0">
+                            <span class="font-bold">${p.name}</span>
+                            <span class="font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-600">${p.runs} <span class="text-[9px]">(${p.balls})</span></span>
+                        </div>`;
+                     });
+                     teamHtml += `<div class="pl-1">${wHtml}</div>`;
+                } else {
+                     teamHtml += `<p class="text-[10px] text-gray-400 italic pl-1">No wickets yet.</p>`;
+                }
+                teamHtml += `</div>`;
+
+                // Bowling Section
+                teamHtml += `<div>
+                    <h4 class="text-[10px] font-bold text-[#F7631B] uppercase tracking-widest mb-2 flex items-center gap-1">
+                        <span>⚾</span> Bowling Figures
+                    </h4>`;
+                
+                if (team.bowlers.length > 0) {
+                     let bHtml = `
+                        <div class="flex justify-between text-[9px] uppercase text-gray-400 font-bold mb-2 pl-1">
+                            <span>Bowler</span>
+                            <span>O-M-R-W</span>
+                        </div>`;
+                     team.bowlers.forEach(p => {
+                        // Note: M (Maidens) not tracked currently, using O-R-W format or standard
+                        bHtml += `
+                        <div class="flex justify-between items-center text-xs text-gray-700 py-1.5 border-b border-dashed border-gray-100 last:border-0 pl-1">
+                            <span class="font-bold">${p.name}</span>
+                            <span class="font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-600">${formatOvers(p.ballsBowled)} - ${p.runsConceded} - ${p.wickets}</span>
+                        </div>`;
+                     });
+                     teamHtml += `<div>${bHtml}</div>`;
+                } else {
+                     teamHtml += `<p class="text-[10px] text-gray-400 italic pl-1">No bowling stats.</p>`;
+                }
+                teamHtml += `</div>`; // End Bowling section
+
+                teamHtml += `</div></div>`; // End Card
+                
+                fullHtml += teamHtml;
+            });
+
+            document.getElementById('v-full-scorecard').innerHTML = fullHtml || '<div class="text-center text-gray-400 py-4 text-xs">Match just started. Waiting for stats.</div>';
             // ------------------------------------------
 
             if (data.startTime) document.getElementById('v-start-time-label').innerText = `Started: ${new Date(data.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
