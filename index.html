@@ -856,14 +856,17 @@
             const overs = Math.floor(data.balls / 6) + "." + (data.balls % 6);
             let statusMsg = "Live Match";
             let headerText = "Live Update";
+            let actionText = "Watch Live Match";
             
             if (data.result) {
                 statusMsg = "Result: " + data.result;
                 headerText = "Match Finished!";
+                actionText = "Watch Match Summary";
             }
             else if (data.isAbandoned) {
                 statusMsg = "Match Abandoned";
                 headerText = "Abandoned";
+                actionText = "View Match Status";
             }
             else if (data.isOnBreak) statusMsg = "Match on Break";
             else if (data.target) {
@@ -874,7 +877,7 @@
 
             const title = "Gully Cricket Score";
             // Included shareUrl directly in text for better compatibility with images
-            const text = `🏏 ${data.battingTeam} vs ${data.bowlingTeam} ⚾\nScore: ${data.runs}/${data.wickets} (${overs})\n${statusMsg}\n\nLink: ${shareUrl}`;
+            const text = `🏏 ${data.battingTeam} vs ${data.bowlingTeam} ⚾\nScore: ${data.runs}/${data.wickets} (${overs})\n${statusMsg}\n\n${actionText}: ${shareUrl}`;
 
             // Image Generation Logic
             let file = null;
