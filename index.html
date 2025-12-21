@@ -270,10 +270,17 @@
 
             <!-- Tabs -->
             <div class="flex p-1 bg-gray-100 rounded-xl mb-6 shadow-inner">
-                <button id="tab-live" onclick="switchLogTab('live')" class="flex-1 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all shadow-sm bg-white text-[#F7631B]">
+                <button id="tab-live" onclick="switchLogTab('live')" class="flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all shadow-sm bg-white text-red-600 border border-red-100">
+                    <span class="relative flex h-2 w-2">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    </span>
                     Live Now
                 </button>
-                <button id="tab-past" onclick="switchLogTab('past')" class="flex-1 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all text-gray-500 hover:bg-gray-200">
+                <button id="tab-past" onclick="switchLogTab('past')" class="flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all text-gray-500 hover:bg-gray-200 border border-transparent">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
                     Past Matches
                 </button>
             </div>
@@ -1633,11 +1640,38 @@
             const btnPast = document.getElementById('tab-past');
             
             if (tab === 'live') {
-                btnLive.className = "flex-1 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all shadow-sm bg-white text-[#F7631B]";
-                btnPast.className = "flex-1 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all text-gray-500 hover:bg-gray-200";
+                btnLive.className = "flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all shadow-sm bg-white text-red-600 border border-red-100";
+                btnLive.innerHTML = `
+                    <span class="relative flex h-2 w-2">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    </span>
+                    Live Now
+                `;
+                
+                btnPast.className = "flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all text-gray-500 hover:bg-gray-200 border border-transparent";
+                btnPast.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Past Matches
+                `;
             } else {
-                btnLive.className = "flex-1 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all text-gray-500 hover:bg-gray-200";
-                btnPast.className = "flex-1 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all shadow-sm bg-white text-[#F7631B]";
+                btnLive.className = "flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all text-gray-500 hover:bg-gray-200 border border-transparent";
+                btnLive.innerHTML = `
+                    <span class="relative flex h-2 w-2">
+                      <span class="relative inline-flex rounded-full h-2 w-2 bg-gray-400"></span>
+                    </span>
+                    Live Now
+                `;
+
+                btnPast.className = "flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all shadow-sm bg-white text-gray-800 border border-gray-200";
+                btnPast.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Past Matches
+                `;
             }
             
             renderHistoryList();
