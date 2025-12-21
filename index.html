@@ -472,7 +472,8 @@
                 
                 <div class="text-center mt-2">
                     <div id="result-emoji" class="text-6xl mb-4 transform hover:scale-110 transition-transform">🏆</div>
-                    <h2 id="result-header" class="text-2xl font-black text-gray-800 mb-2 uppercase tracking-tight">Match Finished!</h2>
+                    <h2 id="result-header" class="text-2xl font-black text-gray-800 uppercase tracking-tight leading-none">Match Finished!</h2>
+                    <p id="result-teams" class="text-sm font-bold text-gray-500 uppercase tracking-wider mt-1 mb-2">Team A vs Team B</p>
                     <p id="winner-text" class="text-xl font-bold text-[#F7631B] mb-6"></p>
                 </div>
                 
@@ -1562,6 +1563,10 @@
             document.getElementById('winner-text').innerText = winner;
             document.getElementById('result-emoji').innerText = "🏆";
             document.getElementById('result-header').innerText = "Match Finished!";
+            
+            // Set Team Names in Image Header
+            document.getElementById('result-teams').innerText = `${match.battingTeam} vs ${match.bowlingTeam}`;
+            
             document.getElementById('winner-text').className = "text-xl font-bold text-[#F7631B] mb-6";
             
             const sTime = match.startTime ? new Date(match.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--';
