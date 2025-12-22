@@ -712,7 +712,7 @@ let match = {
     isAbandoned: false,
     result: null,
     striker: "Striker", nonStriker: "Non-Striker", bowler: "Bowler",
-    playerStats: {}, // { "PlayerName": { runs: 0, balls: 0, wickets: 0, runsConceded: 0, ballsBowled: 0, isOut: false } }
+    playerStats: {}, // { "PlayerName": { runs: 0, balls: 0, wickets: 0, runsConceded: 0, ballsBowled: 0, isOut: false, isRetired: false } }
     bowlersList: [], // Track list of bowlers
     battingOrder: [],
     ballLogs: [], // { overs: "0.1", bowler: "Name", batsman: "Name", outcome: "1", description: "1 Run" }
@@ -841,6 +841,9 @@ window.submitInitialPlayers = async function() {
     const streamBtn = document.getElementById('scorer-stream-btn');
     if(streamBtn) streamBtn.classList.remove('hidden');
 
+    // Inject Retire Button if not already there
+    injectRetireButton();
+
     updateDisplay();
     await syncToCloud();
     showToast("Match Started!", "success");
@@ -863,7 +866,7 @@ window.submitNewBatsman = async function() {
         return;
     }
     
-    // Dynamic update based on who got out
+    // Dynamic update based on who got out/retired
     const slotToFill = wicketState.pendingSlot || 'striker';
     match[slotToFill] = name;
     
@@ -936,6 +939,7 @@ function logBall(outcome, runs, extraType, customDesc) {
     let desc = customDesc || "";
     if (!desc) {
         if (outcome === 'W') desc = `OUT! ${match.striker} is out.`;
+        else if (outcome === 'Rt') desc = "Batsman Retired.";
         else if (extraType === 'WD') desc = "Wide Ball (+1 run)";
         else if (extraType === 'NB') desc = `No Ball (+${runs} runs)`;
         else if (runs === 4) desc = "FOUR! Great Shot.";
@@ -948,9 +952,9 @@ function logBall(outcome, runs, extraType, customDesc) {
         overs: timestamp,
         bowler: match.bowler,
         batsman: match.striker, 
-        outcome: outcome === 'W' ? 'W' : (extraType || runs),
+        outcome: outcome === 'W' ? 'W' : (outcome === 'Rt' ? 'Rt' : (extraType || runs)),
         description: desc,
-        isExtra: !!extraType || outcome === 'W'
+        isExtra: !!extraType || outcome === 'W' || outcome === 'Rt'
     });
 }
 
@@ -1012,11 +1016,18 @@ window.addWicket = async function() {
     const modal = document.getElementById('wicket-type-modal');
     document.getElementById('wicket-main-options').classList.remove('hidden');
     document.getElementById('runout-options').classList.add('hidden');
+    if(document.getElementById('retire-options')) document.getElementById('retire-options').classList.add('hidden'); // Hide retire options if open
     
     // Set dynamic button text for run out targets
     document.getElementById('btn-ro-striker').innerText = `Striker: ${match.striker}`;
     document.getElementById('btn-ro-nonstriker').innerText = `Non-Striker: ${match.nonStriker}`;
     
+    // Update Retire button labels dynamically
+    const btnRetStr = document.getElementById('retire-striker-name');
+    if(btnRetStr) btnRetStr.innerText = match.striker;
+    const btnRetNon = document.getElementById('retire-nonstriker-name');
+    if(btnRetNon) btnRetNon.innerText = match.nonStriker;
+
     // Reset run out selection
     wicketState.runOutTarget = 'striker'; // Default
     highlightRunOutTarget('striker');
@@ -1155,6 +1166,81 @@ window.processRunOut = function() {
     openNewBatsmanModal();
 };
 
+// --- NEW RETIRE LOGIC ---
+function injectRetireButton() {
+    const container = document.getElementById('wicket-main-options');
+    // Ensure container exists and button isn't duplicate
+    if(container && !document.getElementById('btn-retire')) {
+        const btn = document.createElement('button');
+        btn.id = 'btn-retire';
+        btn.className = "p-4 bg-gray-100 rounded-xl flex flex-col items-center justify-center gap-2 hover:bg-gray-200 transition-colors";
+        btn.onclick = () => window.showRetireOptions();
+        btn.innerHTML = `
+            <span class="text-2xl">🏃</span>
+            <span class="font-bold text-sm text-gray-700">Retire</span>
+        `;
+        container.appendChild(btn);
+    }
+    
+    // Inject Retire Options View
+    const modalContent = container ? container.parentNode : null;
+    if(modalContent && !document.getElementById('retire-options')) {
+        const div = document.createElement('div');
+        div.id = 'retire-options';
+        div.className = "hidden space-y-3";
+        div.innerHTML = `
+            <h3 class="text-center font-bold text-gray-700 mb-2">Who is retiring?</h3>
+            <button onclick="confirmRetire('striker')" class="w-full p-3 bg-white border border-gray-200 rounded-lg font-bold text-gray-700 hover:bg-gray-50 flex justify-between items-center">
+                <span>Striker</span>
+                <span id="retire-striker-name" class="text-xs font-normal text-gray-500"></span>
+            </button>
+            <button onclick="confirmRetire('nonStriker')" class="w-full p-3 bg-white border border-gray-200 rounded-lg font-bold text-gray-700 hover:bg-gray-50 flex justify-between items-center">
+                <span>Non-Striker</span>
+                <span id="retire-nonstriker-name" class="text-xs font-normal text-gray-500"></span>
+            </button>
+            <button onclick="cancelRetire()" class="w-full p-2 text-xs font-bold text-gray-400 hover:text-gray-600 mt-2">Cancel</button>
+        `;
+        modalContent.appendChild(div);
+    }
+}
+
+window.showRetireOptions = function() {
+    document.getElementById('wicket-main-options').classList.add('hidden');
+    document.getElementById('retire-options').classList.remove('hidden');
+};
+
+window.cancelRetire = function() {
+    document.getElementById('retire-options').classList.add('hidden');
+    document.getElementById('wicket-main-options').classList.remove('hidden');
+};
+
+window.confirmRetire = function(role) {
+    document.getElementById('wicket-type-modal').classList.add('hidden');
+    document.getElementById('retire-options').classList.add('hidden'); // Reset for next time
+    document.getElementById('wicket-main-options').classList.remove('hidden'); // Reset for next time
+    
+    saveState();
+
+    const playerName = role === 'striker' ? match.striker : match.nonStriker;
+    
+    // 1. Mark as Retired (Not Out, but left crease)
+    const pStats = getStats(playerName, match.battingTeam);
+    pStats.isRetired = true; // Flag for UI
+    pStats.isOut = false;    // Doesn't count as wicket
+    
+    // 2. Log it (Retire outcome usually doesn't increment team balls/runs)
+    // We log it so it appears in commentary
+    logBall('Rt', 0, null, `${playerName} Retired.`);
+
+    // 3. Prepare for new batsman
+    wicketState.pendingSlot = role;
+    
+    // Reset partnership (broken partnership)
+    match.currentPartnership = { runs: 0, balls: 0 };
+
+    openNewBatsmanModal();
+};
+
 function openNewBatsmanModal() {
     const modal = document.getElementById('new-batsman-modal');
     const input = document.getElementById('new-batsman-name');
@@ -1172,13 +1258,13 @@ function openNewBatsmanModal() {
     // 2. Populate Dropdown
     const squad = match.squads && match.squads[match.battingTeam] ? match.squads[match.battingTeam] : [];
     
-    // Filter: Exclude players who are OUT and players currently on the crease (survivor)
+    // Filter: Exclude players who are OUT, Retired, or currently on the crease
     const available = squad.filter(n => {
         const s = match.playerStats[n];
         const isOut = s && s.isOut;
-        // Exclude current pair (one is out, one is survivor - neither can be the new guy)
+        const isRetired = s && s.isRetired; // Exclude retired players from immediate re-selection
         const isOnCrease = n === match.striker || n === match.nonStriker;
-        return !isOut && !isOnCrease;
+        return !isOut && !isRetired && !isOnCrease;
     });
 
     if (available.length > 0) {
@@ -1559,6 +1645,9 @@ window.resumeMatch = function() {
     // Show stream button
     const streamBtn = document.getElementById('scorer-stream-btn');
     if(streamBtn) streamBtn.classList.remove('hidden');
+
+    // Inject Retire Button
+    injectRetireButton();
 
     updateDisplay();
     showToast("Match Resumed Successfully", "success");
@@ -2290,10 +2379,11 @@ function renderCommentary(containerId) {
         if (log.outcome === '4') outcomeClass = "bg-blue-100 text-blue-800 border border-blue-200";
         if (log.outcome === '6') outcomeClass = "bg-orange-100 text-orange-800 border border-orange-200";
         if (log.outcome === 'W') outcomeClass = "bg-red-100 text-red-800 border border-red-200";
+        if (log.outcome === 'Rt') outcomeClass = "bg-purple-100 text-purple-800 border border-purple-200"; // New style for retired
         if (log.isExtra) outcomeClass = "bg-yellow-100 text-yellow-800 border border-yellow-200";
 
         // Swap order for wickets: "Bowler to Batsman", otherwise "Batsman to Bowler"
-        const headline = log.outcome === 'W' 
+        const headline = log.outcome === 'W' || log.outcome === 'Rt'
             ? `${log.bowler} <span class="text-gray-400 font-normal">to</span> ${log.batsman}`
             : `${log.batsman} <span class="text-gray-400 font-normal">to</span> ${log.bowler}`;
 
@@ -2797,7 +2887,7 @@ function updateViewerUI(data) {
 
     // --- Update Viewer Player Stats Display ---
     const stats = data.playerStats || {};
-    const getS = (n) => stats[n] || { runs: 0, balls: 0, wickets: 0, runsConceded: 0, ballsBowled: 0, isOut: false };
+    const getS = (n) => stats[n] || { runs: 0, balls: 0, wickets: 0, runsConceded: 0, ballsBowled: 0, isOut: false, isRetired: false };
     
     const sStats = getS(data.striker || "Striker");
     const nsStats = getS(data.nonStriker || "Non-Striker");
@@ -2904,7 +2994,7 @@ function updateViewerUI(data) {
         if (!teamsMap[tName]) teamsMap[tName] = { name: tName, wickets: [], bowlers: [], batters: [] };
         
         // Check for Batter (Faced balls OR Runs OR Out OR Currently Batting)
-        if (p.balls > 0 || p.runs > 0 || p.isOut || playerName === data.striker || playerName === data.nonStriker) {
+        if (p.balls > 0 || p.runs > 0 || p.isOut || p.isRetired || playerName === data.striker || playerName === data.nonStriker) {
             teamsMap[tName].batters.push({name: playerName, ...p});
         }
 
@@ -2953,9 +3043,19 @@ function updateViewerUI(data) {
         if (team.batters.length > 0) {
                 let wHtml = '';
                 team.batters.forEach(p => {
-                const isNotOut = !p.isOut;
-                const statusText = isNotOut ? 'not out' : 'out';
-                const statusColor = isNotOut ? 'text-green-600' : 'text-red-500';
+                const isNotOut = !p.isOut && !p.isRetired;
+                const isRetired = p.isRetired;
+                let statusText = 'out';
+                let statusColor = 'text-red-500';
+                
+                if (isNotOut) {
+                    statusText = 'not out';
+                    statusColor = 'text-green-600';
+                } else if (isRetired) {
+                    statusText = 'retired';
+                    statusColor = 'text-purple-600';
+                }
+
                 const isStriker = p.name === data.striker && isNotOut;
                 const isNonStriker = p.name === data.nonStriker && isNotOut;
                 const activeMark = (isStriker || isNonStriker) ? '*' : '';
@@ -3054,6 +3154,81 @@ window.hideHistory = function() {
     setupScreen.classList.remove('hidden'); 
     backBtn.classList.add('hidden'); 
     checkForActiveMatch();
+};
+
+// --- NEW RETIRE LOGIC ---
+function injectRetireButton() {
+    const container = document.getElementById('wicket-main-options');
+    // Ensure container exists and button isn't duplicate
+    if(container && !document.getElementById('btn-retire')) {
+        const btn = document.createElement('button');
+        btn.id = 'btn-retire';
+        btn.className = "p-4 bg-gray-100 rounded-xl flex flex-col items-center justify-center gap-2 hover:bg-gray-200 transition-colors";
+        btn.onclick = () => window.showRetireOptions();
+        btn.innerHTML = `
+            <span class="text-2xl">🏃</span>
+            <span class="font-bold text-sm text-gray-700">Retire</span>
+        `;
+        container.appendChild(btn);
+    }
+    
+    // Inject Retire Options View
+    const modalContent = container ? container.parentNode : null;
+    if(modalContent && !document.getElementById('retire-options')) {
+        const div = document.createElement('div');
+        div.id = 'retire-options';
+        div.className = "hidden space-y-3";
+        div.innerHTML = `
+            <h3 class="text-center font-bold text-gray-700 mb-2">Who is retiring?</h3>
+            <button onclick="confirmRetire('striker')" class="w-full p-3 bg-white border border-gray-200 rounded-lg font-bold text-gray-700 hover:bg-gray-50 flex justify-between items-center">
+                <span>Striker</span>
+                <span id="retire-striker-name" class="text-xs font-normal text-gray-500"></span>
+            </button>
+            <button onclick="confirmRetire('nonStriker')" class="w-full p-3 bg-white border border-gray-200 rounded-lg font-bold text-gray-700 hover:bg-gray-50 flex justify-between items-center">
+                <span>Non-Striker</span>
+                <span id="retire-nonstriker-name" class="text-xs font-normal text-gray-500"></span>
+            </button>
+            <button onclick="cancelRetire()" class="w-full p-2 text-xs font-bold text-gray-400 hover:text-gray-600 mt-2">Cancel</button>
+        `;
+        modalContent.appendChild(div);
+    }
+}
+
+window.showRetireOptions = function() {
+    document.getElementById('wicket-main-options').classList.add('hidden');
+    document.getElementById('retire-options').classList.remove('hidden');
+};
+
+window.cancelRetire = function() {
+    document.getElementById('retire-options').classList.add('hidden');
+    document.getElementById('wicket-main-options').classList.remove('hidden');
+};
+
+window.confirmRetire = function(role) {
+    document.getElementById('wicket-type-modal').classList.add('hidden');
+    document.getElementById('retire-options').classList.add('hidden'); // Reset for next time
+    document.getElementById('wicket-main-options').classList.remove('hidden'); // Reset for next time
+    
+    saveState();
+
+    const playerName = role === 'striker' ? match.striker : match.nonStriker;
+    
+    // 1. Mark as Retired (Not Out, but left crease)
+    const pStats = getStats(playerName, match.battingTeam);
+    pStats.isRetired = true; // Flag for UI
+    pStats.isOut = false;    // Doesn't count as wicket
+    
+    // 2. Log it (Retire outcome usually doesn't increment team balls/runs)
+    // We log it so it appears in commentary
+    logBall('Rt', 0, null, `${playerName} Retired.`);
+
+    // 3. Prepare for new batsman
+    wicketState.pendingSlot = role;
+    
+    // Reset partnership (broken partnership)
+    match.currentPartnership = { runs: 0, balls: 0 };
+
+    openNewBatsmanModal();
 };
     </script>
 </body>
