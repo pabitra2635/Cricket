@@ -2495,12 +2495,12 @@ function renderHistoryList() {
     const starredIds = getStarredMatches();
 
     const sortFn = (a, b) => {
-        const isAStarred = starredIds.includes(a.id);
-        const isBStarred = starredIds.includes(b.id);
-        if (isAStarred && !isBStarred) return -1;
-        if (!isAStarred && isBStarred) return 1;
+        // Universal Sort: Star Count Descending (Highest stars first)
+        const starsA = a.starCount || 0;
+        const starsB = b.starCount || 0;
+        if (starsA !== starsB) return starsB - starsA;
         
-        // Fallback to time
+        // Fallback to time (Newest first)
         const timeA = a.startTime ? new Date(a.startTime).getTime() : 0;
         const timeB = b.startTime ? new Date(b.startTime).getTime() : 0;
         return timeB - timeA;
