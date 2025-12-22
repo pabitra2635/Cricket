@@ -631,7 +631,7 @@
     <!-- Firebase SDKs -->
     <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc, collection, getDocs, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, updateDoc, increment, collection, getDocs, serverTimestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -1890,11 +1890,14 @@ async function syncToCloud() {
         else if (match.isOnBreak) statusStr = "On Break";
 
         const matchRef = doc(db, 'artifacts', appId, 'public', 'data', 'matches', currentMatchId);
+        
+        // Use merge: true to avoid overwriting starCount if it exists on server but not locally
         await setDoc(matchRef, {
             ...match, lastUpdated: serverTimestamp(), scorerId: user.uid,
             status: statusStr,
             matchId: currentMatchId 
-        });
+        }, { merge: true });
+        
         syncStatus.classList.replace('bg-yellow-400', 'bg-green-400');
     } catch (err) {
         syncStatus.classList.replace('bg-yellow-400', 'bg-red-500');
@@ -2382,15 +2385,7 @@ window.showHistory = function() {
     unsubscribeHistory = onSnapshot(q, (querySnapshot) => {
         allMatchesCache = [];
         querySnapshot.forEach(doc => allMatchesCache.push({id: doc.id, ...doc.data()}));
-        
-        allMatchesCache.sort((a, b) => {
-            const timeA = a.startTime ? new Date(a.startTime).getTime() : 0;
-            const timeB = b.startTime ? new Date(b.startTime).getTime() : 0;
-            return timeB - timeA;
-        });
-        
         renderHistoryList();
-
     }, (err) => {
         showToast("Stream lost. Please back and return.", "error");
     });
@@ -2440,6 +2435,41 @@ window.switchLogTab = function(tab) {
     renderHistoryList();
 };
 
+function getStarredMatches() {
+    try {
+        return JSON.parse(localStorage.getItem('cricket_scorer_starred') || '[]');
+    } catch { return []; }
+}
+
+window.toggleStar = async function(id, event) {
+    if(event) event.stopPropagation(); // Prevent opening the match
+    const starred = getStarredMatches();
+    const idx = starred.indexOf(id);
+    let isAdding = false;
+    
+    if (idx === -1) {
+        starred.push(id);
+        isAdding = true;
+        showToast("Match favorited", "success");
+    } else {
+        starred.splice(idx, 1);
+        showToast("Match removed from favorites", "info");
+    }
+    localStorage.setItem('cricket_scorer_starred', JSON.stringify(starred));
+    
+    // Optimistic UI Update (will be overwritten by Firestore sync shortly)
+    renderHistoryList();
+
+    // Update Global Star Count in Firestore
+    const matchRef = doc(db, 'artifacts', appId, 'public', 'data', 'matches', id);
+    const change = isAdding ? 1 : -1;
+    try {
+        await updateDoc(matchRef, { starCount: increment(change) });
+    } catch(e) { 
+        console.log("Star count update failed (likely permission/network)", e);
+    }
+};
+
 function renderHistoryList() {
     const list = document.getElementById('history-list');
     const searchVal = document.getElementById('history-search')?.value.trim();
@@ -2461,6 +2491,23 @@ function renderHistoryList() {
 
     const live = filtered.filter(m => m.status === 'Live' || m.status === 'On Break');
     const past = filtered.filter(m => m.status !== 'Live' && m.status !== 'On Break');
+
+    const starredIds = getStarredMatches();
+
+    const sortFn = (a, b) => {
+        const isAStarred = starredIds.includes(a.id);
+        const isBStarred = starredIds.includes(b.id);
+        if (isAStarred && !isBStarred) return -1;
+        if (!isAStarred && isBStarred) return 1;
+        
+        // Fallback to time
+        const timeA = a.startTime ? new Date(a.startTime).getTime() : 0;
+        const timeB = b.startTime ? new Date(b.startTime).getTime() : 0;
+        return timeB - timeA;
+    };
+
+    live.sort(sortFn);
+    past.sort(sortFn);
 
     const renderCard = (m) => {
         const sT = m.startTime ? new Date(m.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--';
@@ -2487,9 +2534,19 @@ function renderHistoryList() {
                 borderClass = 'border-l-4 border-l-[#F7631B]';
         }
 
+        const isStarred = starredIds.includes(m.id);
+        const starFill = isStarred ? "fill-yellow-400 text-yellow-400" : "fill-none text-gray-300 hover:text-yellow-400";
+        const starCountDisplay = m.starCount ? m.starCount : 0;
+
         return `
-            <div class="bg-white border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow ${borderClass}">
-                <div class="flex justify-between items-start mb-2">
+            <div class="bg-white border rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow ${borderClass} relative group">
+                <button onclick="toggleStar('${m.id}', event)" class="absolute top-3 right-3 z-10 flex items-center gap-1 bg-white/80 p-1.5 rounded-full border border-gray-100 shadow-sm hover:bg-gray-50 transition-colors">
+                    <span class="text-[10px] font-bold text-gray-500">${starCountDisplay}</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ${starFill} transition-colors" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                    </svg>
+                </button>
+                <div class="flex justify-between items-start mb-2 pr-14">
                     <div class="flex flex-col">
                         <span class="text-[10px] font-bold text-gray-400 uppercase">${m.startTime ? new Date(m.startTime).toLocaleDateString([], {month:'short', day:'numeric'}) : 'Today'}</span>
                         <span class="text-[10px] font-mono text-gray-500">ID: ${m.id}</span>
