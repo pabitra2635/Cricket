@@ -1949,13 +1949,14 @@ window.saveStream = async function() {
     if (!url) return;
 
     let embedUrl = null;
-    // Simple YouTube Parser
-    const ytRegExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    // Improved YouTube Parser to handle 'live' links and standard formats
+    const ytRegExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|live\/)([^#\&\?]*).*/;
     const matchYT = url.match(ytRegExp);
 
     if (matchYT && matchYT[2].length === 11) {
         embedUrl = `https://www.youtube.com/embed/${matchYT[2]}?autoplay=1&playsinline=1`;
     } else {
+        // Fallback for other video platforms or direct embed links
         embedUrl = url; 
     }
 
