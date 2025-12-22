@@ -385,13 +385,15 @@
                     </div>
                 </div>
 
-                <div id="v-start-time-label" class="text-[10px] text-gray-500 mb-2 uppercase tracking-widest font-medium">Started: --:--</div>
-                
-                <div class="text-5xl font-black mb-1">
-                    <span id="v-runs">0</span>/<span id="v-wickets">0</span>
-                </div>
-                <div class="text-lg text-gray-400 font-bold">
-                    Overs: <span id="v-overs">0.0</span> / <span id="v-limit">5</span>
+                <div class="flex justify-between items-end mb-2">
+                    <div>
+                        <div id="v-start-time-label" class="text-[10px] text-gray-500 uppercase tracking-widest font-medium">Started: --:--</div>
+                        <div id="v-partnership" class="text-[10px] text-[#F7631B] mt-1 font-bold uppercase tracking-wider">Partnership: 0 (0)</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-5xl font-black leading-none"><span id="v-runs">0</span>/<span id="v-wickets">0</span></div>
+                        <div class="text-lg text-gray-400 font-bold leading-none mt-1">Overs: <span id="v-overs">0.0</span> / <span id="v-limit">5</span></div>
+                    </div>
                 </div>
 
                 <!-- Viewer Player Bar -->
@@ -471,9 +473,16 @@
                     </div>
                 </div>
 
-                <div id="start-time-label" class="text-[10px] text-gray-500 mb-2 uppercase tracking-widest font-medium">Started: --:--</div>
-                <div class="text-5xl font-black mb-1"><span id="runs">0</span>/<span id="wickets">0</span></div>
-                <div class="text-lg text-gray-400 font-bold">Overs: <span id="overs">0.0</span> / <span id="limit">5</span></div>
+                <div class="flex justify-between items-end mb-2">
+                    <div>
+                        <div id="start-time-label" class="text-[10px] text-gray-500 uppercase tracking-widest font-medium">Started: --:--</div>
+                        <div id="partnership-display" class="text-[10px] text-[#F7631B] mt-1 font-bold uppercase tracking-wider">Partnership: 0 (0)</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-5xl font-black leading-none"><span id="runs">0</span>/<span id="wickets">0</span></div>
+                        <div class="text-lg text-gray-400 font-bold leading-none mt-1">Overs: <span id="overs">0.0</span> / <span id="limit">5</span></div>
+                    </div>
+                </div>
                 
                 <!-- Player Control Bar -->
                 <!-- Removed w-1/2 to allow flex-1 to take available space naturally -->
@@ -669,7 +678,9 @@
             striker: "Striker", nonStriker: "Non-Striker", bowler: "Bowler",
             playerStats: {}, // { "PlayerName": { runs: 0, balls: 0, wickets: 0, runsConceded: 0, ballsBowled: 0, isOut: false } }
             bowlersList: [], // Track list of bowlers
-            ballLogs: [] // { overs: "0.1", bowler: "Name", batsman: "Name", outcome: "1", description: "1 Run" }
+            battingOrder: [],
+            ballLogs: [], // { overs: "0.1", bowler: "Name", batsman: "Name", outcome: "1", description: "1 Run" }
+            currentPartnership: { runs: 0, balls: 0 } // Init partnership
         };
 
         // --- Toast System ---
@@ -800,6 +811,7 @@
             match.bowler = bowler;
             match.bowlersList = [bowler]; // Init bowler list
             match.battingOrder = [striker, nonStriker]; // Init batting order
+            match.currentPartnership = { runs: 0, balls: 0 }; // Init Partnership
 
             document.getElementById('initial-players-modal').classList.add('hidden');
             scoringScreen.classList.remove('hidden');
@@ -916,6 +928,10 @@
             const totalRuns = 1 + batRuns;
             match.runs += totalRuns;
             
+            // Update Partnership
+            if (!match.currentPartnership) match.currentPartnership = {runs:0, balls:0};
+            match.currentPartnership.runs += totalRuns; 
+            
             // Notation: "NB" if 0, "NB+4" etc.
             const notation = batRuns > 0 ? `NB+${batRuns}` : 'NB';
             match.overHistory.push(notation);
@@ -1011,6 +1027,9 @@
             // For normal wicket, Striker is out, New Batsman replaces Striker.
             wicketState.pendingSlot = 'striker';
             
+            // Reset Partnership
+            match.currentPartnership = { runs: 0, balls: 0 };
+
             openNewBatsmanModal();
         };
 
@@ -1074,6 +1093,11 @@
             sStats.runs += runs;
             sStats.balls += 1;
 
+            // Update Partnership (Runs count before out)
+            if(!match.currentPartnership) match.currentPartnership = {runs:0, balls:0};
+            match.currentPartnership.runs += runs;
+            match.currentPartnership.balls++; 
+
             // Mark the correct person as Out
             // Logic: Who is out is determined by user selection (Striker/Non-Striker)
             const outPlayerName = target === 'striker' ? match.striker : match.nonStriker;
@@ -1101,6 +1125,9 @@
             } else {
                 wicketState.pendingSlot = 'nonStriker';
             }
+
+            // Reset Partnership after processing stats
+            match.currentPartnership = { runs: 0, balls: 0 };
 
             openNewBatsmanModal();
         };
@@ -1472,7 +1499,8 @@
                 playerStats: activeMatchData.playerStats || {},
                 bowlersList: activeMatchData.bowlersList || [],
                 battingOrder: activeMatchData.battingOrder || [], // Load order
-                ballLogs: activeMatchData.ballLogs || []
+                ballLogs: activeMatchData.ballLogs || [],
+                currentPartnership: activeMatchData.currentPartnership || { runs: 0, balls: 0 }
             };
             setupScreen.classList.add('hidden');
             scoringScreen.classList.remove('hidden');
@@ -1558,7 +1586,8 @@
                 playerStats: {},
                 bowlersList: [],
                 battingOrder: [],
-                ballLogs: []
+                ballLogs: [],
+                currentPartnership: { runs: 0, balls: 0 }
             };
         }
 
@@ -1629,6 +1658,7 @@
             match.maxOvers = parseInt(document.getElementById('max-overs').value);
             match.playerCount = parseInt(document.getElementById('player-count').value);
             match.startTime = new Date().toISOString();
+            match.currentPartnership = { runs: 0, balls: 0 };
             
             // Use the numeric ID
             currentMatchId = newId;
@@ -1683,6 +1713,11 @@
             bStats.runsConceded += r; bStats.ballsBowled += 1;
             // --------------------
 
+            // Partnership Update
+            if(!match.currentPartnership) match.currentPartnership = {runs:0, balls:0};
+            match.currentPartnership.runs += r;
+            match.currentPartnership.balls++;
+
             // Log Commentary
             logBall(r, r, null);
 
@@ -1721,6 +1756,10 @@
             const bStats = getStats(match.bowler, match.bowlingTeam);
             bStats.runsConceded += 1;
             // --------------------
+
+            // Partnership Update (Runs only, balls usually don't count for WD/NB)
+            if(!match.currentPartnership) match.currentPartnership = {runs:0, balls:0};
+            match.currentPartnership.runs += 1;
 
             // Log Commentary
             logBall(1, 1, type);
@@ -1789,6 +1828,7 @@
             match.striker = "Striker"; match.nonStriker = "Non-Striker"; match.bowler = "Bowler";
             match.bowlersList = []; // New innings, new bowlers (or same players but bowling for other team now)
             match.ballLogs = []; // Clear commentary
+            match.currentPartnership = { runs: 0, balls: 0 }; // Reset partnership
 
             document.getElementById('display-target').classList.remove('hidden');
             document.getElementById('rrr-container').classList.remove('hidden');
@@ -1902,6 +1942,11 @@
             document.getElementById('overs').innerText = formatOvers(match.balls);
             document.getElementById('limit').innerText = match.maxOvers;
             
+            // Partnership
+            const pRuns = match.currentPartnership ? match.currentPartnership.runs : 0;
+            const pBalls = match.currentPartnership ? match.currentPartnership.balls : 0;
+            document.getElementById('partnership-display').innerText = `PARTNERSHIP: ${pRuns} (${pBalls})`;
+
             // --- Update Player Stats Display ---
             const sStats = getStats(match.striker, match.battingTeam);
             const nsStats = getStats(match.nonStriker, match.battingTeam);
@@ -2006,7 +2051,8 @@
                 runs: match.runs, wickets: match.wickets, balls: match.balls, overHistory: [...match.overHistory],
                 striker: match.striker, nonStriker: match.nonStriker, bowler: match.bowler,
                 playerStats: statsCopy, bowlersList: [...match.bowlersList],
-                ballLogs: [...match.ballLogs]
+                ballLogs: [...match.ballLogs],
+                currentPartnership: {...match.currentPartnership}
             }));
             if (match.history.length > 30) match.history.shift();
             match.redoStack = [];
@@ -2019,7 +2065,8 @@
                 runs: match.runs, wickets: match.wickets, balls: match.balls, overHistory: [...match.overHistory],
                 striker: match.striker, nonStriker: match.nonStriker, bowler: match.bowler,
                 playerStats: statsCopy, bowlersList: [...match.bowlersList],
-                ballLogs: [...match.ballLogs]
+                ballLogs: [...match.ballLogs],
+                currentPartnership: {...match.currentPartnership}
             }));
             const prevState = JSON.parse(match.history.pop());
             match.runs = prevState.runs; match.wickets = prevState.wickets;
@@ -2030,6 +2077,7 @@
             if(prevState.playerStats) match.playerStats = prevState.playerStats;
             if(prevState.bowlersList) match.bowlersList = prevState.bowlersList;
             if(prevState.ballLogs) match.ballLogs = prevState.ballLogs;
+            if(prevState.currentPartnership) match.currentPartnership = prevState.currentPartnership;
             
             updateDisplay(); await syncToCloud();
             showToast("Action Undone", "info");
@@ -2042,7 +2090,8 @@
                 runs: match.runs, wickets: match.wickets, balls: match.balls, overHistory: [...match.overHistory],
                 striker: match.striker, nonStriker: match.nonStriker, bowler: match.bowler,
                 playerStats: statsCopy, bowlersList: [...match.bowlersList],
-                ballLogs: [...match.ballLogs]
+                ballLogs: [...match.ballLogs],
+                currentPartnership: {...match.currentPartnership}
             }));
             const nextState = JSON.parse(match.redoStack.pop());
             match.runs = nextState.runs; match.wickets = nextState.wickets;
@@ -2053,6 +2102,7 @@
             if(nextState.playerStats) match.playerStats = nextState.playerStats;
             if(nextState.bowlersList) match.bowlersList = nextState.bowlersList;
             if(nextState.ballLogs) match.ballLogs = nextState.ballLogs;
+            if(nextState.currentPartnership) match.currentPartnership = nextState.currentPartnership;
 
             updateDisplay(); await syncToCloud();
             showToast("Action Redone", "info");
@@ -2293,6 +2343,11 @@
             document.getElementById('v-runs').innerText = data.runs; document.getElementById('v-wickets').innerText = data.wickets;
             document.getElementById('v-overs').innerText = formatOvers(data.balls); document.getElementById('v-limit').innerText = data.maxOvers;
             
+            // Partnership
+            const pRuns = data.currentPartnership ? data.currentPartnership.runs : 0;
+            const pBalls = data.currentPartnership ? data.currentPartnership.balls : 0;
+            document.getElementById('v-partnership').innerText = `PARTNERSHIP: ${pRuns} (${pBalls})`;
+
             // --- Update Viewer Player Stats Display ---
             const stats = data.playerStats || {};
             const getS = (n) => stats[n] || { runs: 0, balls: 0, wickets: 0, runsConceded: 0, ballsBowled: 0, isOut: false };
