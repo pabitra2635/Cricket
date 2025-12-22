@@ -717,7 +717,8 @@ let match = {
     battingOrder: [],
     ballLogs: [], // { overs: "0.1", bowler: "Name", batsman: "Name", outcome: "1", description: "1 Run" }
     currentPartnership: { runs: 0, balls: 0 }, // Init partnership
-    squads: {} // { "Team A": ["P1", "P2"], "Team B": ["P1", "P2"] }
+    squads: {}, // { "Team A": ["P1", "P2"], "Team B": ["P1", "P2"] }
+    stream: null // { url: string, active: boolean }
 };
 
 // --- Toast System ---
@@ -836,6 +837,10 @@ window.submitInitialPlayers = async function() {
     backBtn.classList.remove('hidden');
     resumeContainer.classList.add('hidden');
     
+    // Show stream button
+    const streamBtn = document.getElementById('scorer-stream-btn');
+    if(streamBtn) streamBtn.classList.remove('hidden');
+
     updateDisplay();
     await syncToCloud();
     showToast("Match Started!", "success");
@@ -1543,12 +1548,18 @@ window.resumeMatch = function() {
         battingOrder: activeMatchData.battingOrder || [], 
         ballLogs: activeMatchData.ballLogs || [],
         currentPartnership: activeMatchData.currentPartnership || { runs: 0, balls: 0 },
-        squads: activeMatchData.squads || {}
+        squads: activeMatchData.squads || {},
+        stream: activeMatchData.stream || null
     };
     setupScreen.classList.add('hidden');
     scoringScreen.classList.remove('hidden');
     backBtn.classList.remove('hidden');
     resumeContainer.classList.add('hidden');
+    
+    // Show stream button
+    const streamBtn = document.getElementById('scorer-stream-btn');
+    if(streamBtn) streamBtn.classList.remove('hidden');
+
     updateDisplay();
     showToast("Match Resumed Successfully", "success");
 };
@@ -1571,6 +1582,10 @@ window.abandonMatch = async function() {
         resultScreen.classList.remove('hidden');
         backBtn.classList.remove('hidden');
         
+        // Hide stream button
+        const streamBtn = document.getElementById('scorer-stream-btn');
+        if(streamBtn) streamBtn.classList.add('hidden');
+
         document.getElementById('result-emoji').innerText = "☁️";
         document.getElementById('result-header').innerText = "Match Abandoned";
         document.getElementById('winner-text').innerText = "No Result";
@@ -1605,6 +1620,11 @@ window.handleGlobalBack = async function() {
             scoringScreen.classList.add('hidden');
             setupScreen.classList.remove('hidden');
             backBtn.classList.add('hidden');
+            
+            // Hide stream button
+            const streamBtn = document.getElementById('scorer-stream-btn');
+            if(streamBtn) streamBtn.classList.add('hidden');
+
             checkForActiveMatch();
         }
     } else if (!historyScreen.classList.contains('hidden')) {
@@ -1631,7 +1651,8 @@ function resetAppState() {
         battingOrder: [],
         ballLogs: [],
         currentPartnership: { runs: 0, balls: 0 },
-        squads: {}
+        squads: {},
+        stream: null
     };
 }
 
@@ -1830,6 +1851,7 @@ window.generateMatchIdAndStart = async function() {
     match.isAbandoned = false; match.result = null; match.isOnBreak = false;
     match.startTime = new Date().toISOString();
     match.currentPartnership = { runs: 0, balls: 0 };
+    match.stream = null;
     
     currentMatchId = newId;
     
@@ -1878,6 +1900,78 @@ window.generateMatchIdAndStart = async function() {
 };
 
 // ---------------------------------------------
+
+// --- NEW: Stream Modal Injection & Functions ---
+function injectStreamSetup() {
+    const modalHTML = `
+    <div id="stream-modal" class="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center hidden backdrop-blur-sm p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div class="bg-red-600 p-4 flex justify-between items-center">
+                <h3 class="text-white font-bold flex items-center gap-2">
+                    <span>🎥</span> Live Stream Setup
+                </h3>
+                <button onclick="document.getElementById('stream-modal').classList.add('hidden')" class="text-white hover:bg-red-700 rounded-full p-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">YouTube Video/Live URL</label>
+                    <input type="text" id="stream-url-input" class="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-red-500 outline-none" placeholder="e.g. https://youtu.be/..." />
+                    <p class="text-xs text-gray-400 mt-1">Paste the share link from YouTube Mobile or Desktop.</p>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button onclick="clearStream()" class="px-4 py-2 text-sm text-red-600 font-bold hover:bg-red-50 rounded-lg">Remove Stream</button>
+                    <button onclick="saveStream()" class="px-6 py-2 text-sm bg-red-600 text-white font-bold rounded-lg shadow hover:bg-red-700">Go Live</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    // Inject Floating Stream Button for Scorer
+    const streamBtn = document.createElement('button');
+    streamBtn.className = "hidden fixed bottom-24 right-4 z-40 bg-red-600 text-white p-3 rounded-full shadow-lg flex items-center justify-center hover:bg-red-700 transition-transform transform hover:scale-105 border-2 border-white";
+    streamBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>`;
+    streamBtn.onclick = () => {
+        document.getElementById('stream-modal').classList.remove('hidden');
+    };
+    streamBtn.id = "scorer-stream-btn";
+    document.body.appendChild(streamBtn);
+}
+
+// Call injection
+injectStreamSetup();
+
+window.saveStream = async function() {
+    const url = document.getElementById('stream-url-input').value.trim();
+    if (!url) return;
+
+    let embedUrl = null;
+    // Simple YouTube Parser
+    const ytRegExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const matchYT = url.match(ytRegExp);
+
+    if (matchYT && matchYT[2].length === 11) {
+        embedUrl = `https://www.youtube.com/embed/${matchYT[2]}?autoplay=1&playsinline=1`;
+    } else {
+        embedUrl = url; 
+    }
+
+    match.stream = { url: embedUrl, active: true };
+    document.getElementById('stream-modal').classList.add('hidden');
+    await syncToCloud();
+    showToast("Stream attached to match!", "success");
+};
+
+window.clearStream = async function() {
+    match.stream = null;
+    document.getElementById('stream-url-input').value = '';
+    document.getElementById('stream-modal').classList.add('hidden');
+    await syncToCloud();
+    showToast("Stream removed", "info");
+};
 
 async function syncToCloud() {
     if (!user || !currentMatchId) return;
@@ -2025,6 +2119,11 @@ function handleEndOfOver() {
         if(input) input.classList.remove('hidden');
     }
 
+    // Default to first option if available
+    if (select.options.length > 0) {
+        select.selectedIndex = 0;
+    }
+
     // Show Modal
     const modal = document.getElementById('next-bowler-modal');
     modal.classList.remove('hidden');
@@ -2104,6 +2203,11 @@ function endMatch(winner) {
     match.isOnBreak = false;
     scoringScreen.classList.add('hidden'); resultScreen.classList.remove('hidden');
     backBtn.classList.remove('hidden');
+    
+    // Hide stream button
+    const streamBtn = document.getElementById('scorer-stream-btn');
+    if(streamBtn) streamBtn.classList.add('hidden');
+
     document.getElementById('winner-text').innerText = winner;
     document.getElementById('result-emoji').innerText = "🏆";
     document.getElementById('result-header').innerText = "Match Finished!";
@@ -2309,7 +2413,8 @@ function saveState() {
         playerStats: statsCopy, bowlersList: [...match.bowlersList],
         ballLogs: [...match.ballLogs],
         currentPartnership: {...match.currentPartnership},
-        squads: {...match.squads}
+        squads: {...match.squads},
+        stream: match.stream
     }));
     if (match.history.length > 30) match.history.shift();
     match.redoStack = [];
@@ -2324,7 +2429,8 @@ window.undoLast = async function() {
         playerStats: statsCopy, bowlersList: [...match.bowlersList],
         ballLogs: [...match.ballLogs],
         currentPartnership: {...match.currentPartnership},
-        squads: {...match.squads}
+        squads: {...match.squads},
+        stream: match.stream
     }));
     const prevState = JSON.parse(match.history.pop());
     match.runs = prevState.runs; match.wickets = prevState.wickets;
@@ -2337,6 +2443,7 @@ window.undoLast = async function() {
     if(prevState.ballLogs) match.ballLogs = prevState.ballLogs;
     if(prevState.currentPartnership) match.currentPartnership = prevState.currentPartnership;
     if(prevState.squads) match.squads = prevState.squads;
+    if(prevState.stream) match.stream = prevState.stream;
     
     updateDisplay(); await syncToCloud();
     showToast("Action Undone", "info");
@@ -2351,7 +2458,8 @@ window.redoLast = async function() {
         playerStats: statsCopy, bowlersList: [...match.bowlersList],
         ballLogs: [...match.ballLogs],
         currentPartnership: {...match.currentPartnership},
-        squads: {...match.squads}
+        squads: {...match.squads},
+        stream: match.stream
     }));
     const nextState = JSON.parse(match.redoStack.pop());
     match.runs = nextState.runs; match.wickets = nextState.wickets;
@@ -2364,6 +2472,7 @@ window.redoLast = async function() {
     if(nextState.ballLogs) match.ballLogs = nextState.ballLogs;
     if(nextState.currentPartnership) match.currentPartnership = nextState.currentPartnership;
     if(nextState.squads) match.squads = nextState.squads;
+    if(nextState.stream) match.stream = nextState.stream;
 
     updateDisplay(); await syncToCloud();
     showToast("Action Redone", "info");
@@ -2675,6 +2784,29 @@ function updateViewerUI(data) {
     document.getElementById('v-label-nonStriker').innerText = `${data.nonStriker || "Non-Striker"} (${nsStats.runs} off ${nsStats.balls})`;
     document.getElementById('v-label-bowler').innerText = `${data.bowler || "Bowler"} (${bStats.wickets}-${bStats.runsConceded}, ${formatOvers(bStats.ballsBowled)})`;
     
+    // --- Render Video Player if stream exists ---
+    let videoContainer = document.getElementById('viewer-video-container');
+    if (!videoContainer) {
+        // Create container if not exists
+        const viewerContent = document.getElementById('viewer-screen').querySelector('div');
+        videoContainer = document.createElement('div');
+        videoContainer.id = 'viewer-video-container';
+        videoContainer.className = "mb-4 hidden rounded-xl overflow-hidden shadow-lg bg-black aspect-video";
+        viewerContent.insertBefore(videoContainer, viewerContent.firstChild.nextSibling); // Insert after header
+    }
+
+    if (data.stream && data.stream.active && data.stream.url) {
+        videoContainer.classList.remove('hidden');
+        // Prevent re-render if src hasn't changed to avoid reloading video
+        const currentIframe = videoContainer.querySelector('iframe');
+        if (!currentIframe || currentIframe.src !== data.stream.url) {
+            videoContainer.innerHTML = `<iframe src="${data.stream.url}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen class="w-full h-full"></iframe>`;
+        }
+    } else {
+        videoContainer.classList.add('hidden');
+        videoContainer.innerHTML = '';
+    }
+
     // --- Handle Overlay ---
     const vB = document.getElementById('v-break-overlay');
     if (data.status === "On Break" || data.status === "Abandoned") {
