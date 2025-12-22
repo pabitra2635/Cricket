@@ -2183,7 +2183,10 @@ function switchToSecondInnings() {
     
     // Helper to replace input with select (Repeated logic because context changed)
     const replaceWithSelect = (id, squad, placeholder, defaultIndex = -1) => {
-        const container = document.getElementById(id).parentNode;
+        const element = document.getElementById(id);
+        if(!element) return;
+        const container = element.parentNode;
+        
         if (squad.length > 0) {
             let options = '';
             squad.forEach((p, i) => {
@@ -2196,6 +2199,11 @@ function switchToSecondInnings() {
                     ${options}
                 </select>
             `;
+        } else {
+             container.innerHTML = `
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">${placeholder}</label>
+                <input type="text" id="${id}" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg font-bold text-gray-800 focus:outline-none focus:border-brand-primary" placeholder="Enter Name">
+            `;
         }
     };
 
@@ -2204,6 +2212,12 @@ function switchToSecondInnings() {
     replaceWithSelect('init-bowler', bowlSquad, 'Opening Bowler', 0);
 
     initModal.classList.remove('hidden');
+    // Fix: Trigger animation classes so the modal actually appears
+    initModal.querySelector('.relative').classList.add('modal-enter');
+    setTimeout(() => {
+        initModal.querySelector('.relative').classList.remove('modal-enter');
+        initModal.querySelector('.relative').classList.add('modal-active');
+    }, 10);
 }
 
 function endMatch(winner) {
