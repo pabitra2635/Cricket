@@ -4,7 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gully Cricket Live Scorer</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#F7631B">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="GullyScorer">
     <link rel="icon" href="https://mgcub.ac.in/images/rotate.png" type="image/png">
+    <link rel="manifest" id="app-manifest">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <style type="text/tailwindcss">
         /* Updated Ball Design */
@@ -68,6 +76,13 @@
                         </div>
                     </div>
                 </div>
+                
+                <!-- Install Button -->
+                <button id="install-btn" class="hidden bg-white/20 hover:bg-white/30 p-2 rounded-full text-white transition-colors shadow-inner" title="Install App">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                </button>
             </div>
         </header>
 
@@ -651,6 +666,45 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
         const appId = "cricket-mgcub-v1"; 
+
+        // --- PWA Logic ---
+        const installBtn = document.getElementById('install-btn');
+        let deferredPrompt;
+
+        // Dynamic Manifest Injection
+        const manifest = {
+            "name": "Gully Cricket Scorer",
+            "short_name": "GullyScorer",
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#ffffff",
+            "theme_color": "#F7631B",
+            "description": "Live score your gully cricket matches effortlessly.",
+            "icons": [
+                { "src": "https://mgcub.ac.in/images/rotate.png", "sizes": "192x192", "type": "image/png" },
+                { "src": "https://mgcub.ac.in/images/rotate.png", "sizes": "512x512", "type": "image/png" }
+            ]
+        };
+        const stringManifest = JSON.stringify(manifest);
+        const blob = new Blob([stringManifest], {type: 'application/json'});
+        const manifestURL = URL.createObjectURL(blob);
+        document.querySelector('#app-manifest').setAttribute('href', manifestURL);
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installBtn.classList.remove('hidden'); // Show install button
+        });
+
+        installBtn.addEventListener('click', async () => {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                installBtn.classList.add('hidden');
+            }
+            deferredPrompt = null;
+        });
 
         let user = null;
         let currentMatchId = null;
