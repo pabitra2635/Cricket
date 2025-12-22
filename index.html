@@ -851,7 +851,7 @@
             }
         };
 
-        window.submitInitialPlayers = async function() {
+window.submitInitialPlayers = async function() {
             let striker = document.getElementById('init-striker').value.trim();
             let nonStriker = document.getElementById('init-non-striker').value.trim();
             let bowler = document.getElementById('init-bowler').value.trim();
@@ -863,9 +863,23 @@
             match.striker = striker;
             match.nonStriker = nonStriker;
             match.bowler = bowler;
-            match.bowlersList = [bowler]; // Init bowler list
-            match.battingOrder = [striker, nonStriker]; // Init batting order
-            match.currentPartnership = { runs: 0, balls: 0 }; // Init Partnership
+            
+            // Fix: Initialize list if empty, otherwise keep existing logic for bowlers
+            if (!match.bowlersList) match.bowlersList = [];
+            // Only reset bowlers list if it's the very start of the match (Innings 1)
+            // For Innings 2, we usually reset it in switchToSecondInnings, so this is safe to just add/ensure.
+            // If we want fresh bowlers for innings 2, switchToSecondInnings already clears this array.
+            if (match.bowlersList.length === 0) match.bowlersList = [bowler];
+
+            // --- FIX START: Maintain Batting Order ---
+            // Instead of overwriting match.battingOrder = [...], we append.
+            if (!match.battingOrder) match.battingOrder = [];
+            
+            if (!match.battingOrder.includes(striker)) match.battingOrder.push(striker);
+            if (!match.battingOrder.includes(nonStriker)) match.battingOrder.push(nonStriker);
+            // --- FIX END ---
+
+            match.currentPartnership = { runs: 0, balls: 0 }; 
 
             document.getElementById('initial-players-modal').classList.add('hidden');
             scoringScreen.classList.remove('hidden');
