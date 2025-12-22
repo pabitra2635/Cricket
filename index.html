@@ -33,6 +33,16 @@
         .transform-style-3d { transform-style: preserve-3d; }
         .backface-hidden { backface-visibility: hidden; }
         .rotate-y-180 { transform: rotateY(180deg); }
+
+        /* Coin Button Spin Animation */
+        @keyframes coin-y-spin {
+            0% { transform: rotateY(0deg); }
+            100% { transform: rotateY(360deg); }
+        }
+        .coin-spin-anim {
+            display: inline-block;
+            animation: coin-y-spin 2s infinite linear;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen font-sans text-gray-900">
@@ -105,8 +115,13 @@
                 </div>
 
                 <div class="flex justify-end -mt-2">
-                    <button onclick="openTossModal()" class="text-xs font-bold text-[#F7631B] flex items-center gap-1 border border-orange-200 px-3 py-1.5 rounded-full hover:bg-orange-50 transition-colors shadow-sm">
-                        <span>🪙</span> Digital Toss
+                    <button onclick="openTossModal()" class="group bg-white border border-orange-200 text-gray-700 hover:text-[#F7631B] hover:border-orange-300 px-4 py-1.5 rounded-full shadow-sm hover:shadow-md transition-all flex items-center gap-2 perspective-[500px]">
+                        <span class="relative flex h-2 w-2">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
+                        </span>
+                        <span class="text-[10px] font-black uppercase tracking-widest">Digital Toss</span>
+                        <span class="text-sm coin-spin-anim group-hover:[animation-play-state:paused]">🪙</span>
                     </button>
                 </div>
 
@@ -126,12 +141,16 @@
                 </button>
 
                 <div class="pt-2">
-                    <button onclick="showHistory()" class="w-full bg-white text-gray-700 font-bold py-4 rounded-xl border-2 border-gray-200 transition-all active:scale-95 uppercase text-xs flex items-center justify-center gap-3 shadow-sm hover:border-orange-200">
-                        <span class="relative flex h-3 w-3">
-                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                            <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                        </span>
-                        View Live Scores & History
+                    <button onclick="showHistory()" class="group w-full bg-white hover:bg-gray-50 text-gray-700 font-bold py-4 rounded-xl border border-gray-200 transition-all active:scale-95 uppercase text-xs flex items-center justify-center gap-3 shadow-md hover:shadow-lg relative overflow-hidden">
+                        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 via-red-400 to-red-500"></div>
+                        <div class="flex items-center gap-2 px-3 py-1 bg-red-50 text-red-600 rounded-full border border-red-100">
+                            <span class="relative flex h-2 w-2">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                            </span>
+                            <span class="text-[10px] font-black tracking-wider">LIVE</span>
+                        </div>
+                        <span class="text-gray-600 group-hover:text-gray-800">Scores & History</span>
                     </button>
                 </div>
             </div>
@@ -750,7 +769,15 @@
         window.savePlayerName = async function() {
             const name = document.getElementById('player-name-input').value.trim();
             if(name && currentEditRole) {
+                const oldName = match[currentEditRole];
                 match[currentEditRole] = name;
+                
+                // Update Batting Order if exists
+                if (match.battingOrder) {
+                    const idx = match.battingOrder.indexOf(oldName);
+                    if (idx !== -1) match.battingOrder[idx] = name;
+                }
+
                 document.getElementById('player-modal').classList.add('hidden');
                 updateDisplay();
                 await syncToCloud();
@@ -772,6 +799,7 @@
             match.nonStriker = nonStriker;
             match.bowler = bowler;
             match.bowlersList = [bowler]; // Init bowler list
+            match.battingOrder = [striker, nonStriker]; // Init batting order
 
             document.getElementById('initial-players-modal').classList.add('hidden');
             scoringScreen.classList.remove('hidden');
@@ -796,6 +824,10 @@
             const slotToFill = wicketState.pendingSlot || 'striker';
             match[slotToFill] = name;
             
+            // Add to batting order
+            if (!match.battingOrder) match.battingOrder = [];
+            if (!match.battingOrder.includes(name)) match.battingOrder.push(name);
+
             document.getElementById('new-batsman-modal').classList.add('hidden');
             document.getElementById('new-batsman-name').value = '';
             
@@ -1439,6 +1471,7 @@
                 bowler: activeMatchData.bowler || "Bowler",
                 playerStats: activeMatchData.playerStats || {},
                 bowlersList: activeMatchData.bowlersList || [],
+                battingOrder: activeMatchData.battingOrder || [], // Load order
                 ballLogs: activeMatchData.ballLogs || []
             };
             setupScreen.classList.add('hidden');
@@ -1524,6 +1557,7 @@
                 striker: "Striker", nonStriker: "Non-Striker", bowler: "Bowler",
                 playerStats: {},
                 bowlersList: [],
+                battingOrder: [],
                 ballLogs: []
             };
         }
@@ -1587,7 +1621,7 @@
             match.runs = 0; match.wickets = 0; match.balls = 0;
             match.history = []; match.redoStack = []; match.overHistory = [];
             match.ballLogs = []; // Clear commentary logs
-            match.playerStats = {}; match.bowlersList = [];
+            match.playerStats = {}; match.bowlersList = []; match.battingOrder = [];
             match.innings = 1; match.target = null;
             match.isAbandoned = false; match.result = null; match.isOnBreak = false;
 
@@ -2316,6 +2350,15 @@
                 `;
             }
 
+            // Determine Batting Order from Ball Logs (Fallback)
+            const appearanceIdx = {};
+            let idxCounter = 0;
+            (data.ballLogs || []).forEach(log => {
+                if (appearanceIdx[log.batsman] === undefined) {
+                    appearanceIdx[log.batsman] = idxCounter++;
+                }
+            });
+
             // Group By Team Logic
             const teamsMap = {};
             // Ensure current teams exist in map
@@ -2349,13 +2392,34 @@
             Object.values(teamsMap).forEach(team => {
                 if (team.name === 'Other' && team.batters.length === 0 && team.bowlers.length === 0) return;
                 
+                // Sort Batters by Appearance
+                team.batters.sort((a, b) => {
+                    // Method 1: Explicit Order (from battingOrder array)
+                    if (data.battingOrder && data.battingOrder.length > 0) {
+                        const idxA = data.battingOrder.indexOf(a.name);
+                        const idxB = data.battingOrder.indexOf(b.name);
+                        // If found, return index. If not found (e.g. glitch), put at end.
+                        const valA = idxA > -1 ? idxA : 999;
+                        const valB = idxB > -1 ? idxB : 999;
+                        return valA - valB;
+                    }
+
+                    // Method 2: Log Appearance (Legacy Fallback)
+                    const idxA = appearanceIdx[a.name] !== undefined ? appearanceIdx[a.name] : 999;
+                    const idxB = appearanceIdx[b.name] !== undefined ? appearanceIdx[b.name] : 999;
+                    return idxA - idxB;
+                });
+
+                // Sort Bowlers Alphabetically
+                team.bowlers.sort((a, b) => a.name.localeCompare(b.name));
+
                 let teamHtml = `<div class="mb-4 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                     <div class="bg-gray-50 px-4 py-3 border-b border-gray-200">
                         <h3 class="font-black text-gray-800 uppercase tracking-wider">${team.name}</h3>
                     </div>
                     <div class="p-4 space-y-6">`;
                 
-                // Batting Section (Replaces Fall of Wickets)
+                // Batting Section
                 teamHtml += `<div>
                     <h4 class="text-[10px] font-bold text-[#F7631B] uppercase tracking-widest mb-2 flex items-center gap-1">
                         <span>🏏</span> Batting
