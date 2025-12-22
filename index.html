@@ -571,9 +571,9 @@
         <div id="player-modal" class="hidden fixed inset-0 z-[85] flex items-center justify-center p-4">
              <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onclick="document.getElementById('player-modal').classList.add('hidden')"></div>
              <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden p-6 modal-enter">
-                 <button onclick="document.getElementById('player-modal').classList.add('hidden')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10">
+                  <button onclick="document.getElementById('player-modal').classList.add('hidden')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                 </button>
+                  </button>
                   <h3 id="player-modal-title" class="text-lg font-black uppercase text-gray-800 mb-4">Update Player</h3>
                   <input type="text" id="player-name-input" class="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-[#F7631B] outline-none font-bold mb-4" placeholder="Enter Name">
                   <div class="flex gap-3">
@@ -2241,8 +2241,8 @@
             // Group By Team Logic
             const teamsMap = {};
             // Ensure current teams exist in map
-            if (data.battingTeam) teamsMap[data.battingTeam] = { name: data.battingTeam, wickets: [], bowlers: [] };
-            if (data.bowlingTeam) teamsMap[data.bowlingTeam] = { name: data.bowlingTeam, wickets: [], bowlers: [] };
+            if (data.battingTeam) teamsMap[data.battingTeam] = { name: data.battingTeam, wickets: [], bowlers: [], batters: [] };
+            if (data.bowlingTeam) teamsMap[data.bowlingTeam] = { name: data.bowlingTeam, wickets: [], bowlers: [], batters: [] };
 
             Object.keys(stats).forEach(playerName => {
                 const p = stats[playerName];
@@ -2255,8 +2255,13 @@
                     else tName = 'Other'; 
                 }
 
-                if (!teamsMap[tName]) teamsMap[tName] = { name: tName, wickets: [], bowlers: [] };
+                if (!teamsMap[tName]) teamsMap[tName] = { name: tName, wickets: [], bowlers: [], batters: [] };
                 
+                // Check for Batter (Faced balls OR Runs OR Out OR Currently Batting)
+                if (p.balls > 0 || p.runs > 0 || p.isOut || playerName === data.striker || playerName === data.nonStriker) {
+                    teamsMap[tName].batters.push({name: playerName, ...p});
+                }
+
                 if (p.isOut) teamsMap[tName].wickets.push({name: playerName, ...p});
                 if (p.ballsBowled > 0 || p.runsConceded > 0) teamsMap[tName].bowlers.push({name: playerName, ...p});
             });
@@ -2264,36 +2269,43 @@
             let fullHtml = resultBanner;
 
             Object.values(teamsMap).forEach(team => {
-                if (team.name === 'Other' && team.wickets.length === 0 && team.bowlers.length === 0) return;
+                if (team.name === 'Other' && team.batters.length === 0 && team.bowlers.length === 0) return;
                 
-                // Only show if there is data
-                // Commented out to ensure headers show even if empty
-                // if (team.wickets.length === 0 && team.bowlers.length === 0) return;
-
                 let teamHtml = `<div class="mb-4 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                     <div class="bg-gray-50 px-4 py-3 border-b border-gray-200">
                         <h3 class="font-black text-gray-800 uppercase tracking-wider">${team.name}</h3>
                     </div>
                     <div class="p-4 space-y-6">`;
                 
-                // Wickets Section
+                // Batting Section (Replaces Fall of Wickets)
                 teamHtml += `<div>
                     <h4 class="text-[10px] font-bold text-[#F7631B] uppercase tracking-widest mb-2 flex items-center gap-1">
-                        <span>🏏</span> Fall of Wickets
+                        <span>🏏</span> Batting
                     </h4>`;
                 
-                if (team.wickets.length > 0) {
+                if (team.batters.length > 0) {
                       let wHtml = '';
-                      team.wickets.forEach(p => {
+                      team.batters.forEach(p => {
+                        const isNotOut = !p.isOut;
+                        const statusText = isNotOut ? 'not out' : 'out';
+                        const statusColor = isNotOut ? 'text-green-600' : 'text-red-500';
+                        const isStriker = p.name === data.striker && isNotOut;
+                        const isNonStriker = p.name === data.nonStriker && isNotOut;
+                        const activeMark = (isStriker || isNonStriker) ? '*' : '';
+                        const nameClass = (isStriker || isNonStriker) ? 'font-bold text-gray-900' : 'font-medium text-gray-700';
+
                         wHtml += `
-                        <div class="flex justify-between items-center text-xs text-gray-700 py-1.5 border-b border-dashed border-gray-100 last:border-0">
-                            <span class="font-bold">${p.name}</span>
-                            <span class="font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-600">${p.runs} <span class="text-[9px]">(${p.balls})</span></span>
+                        <div class="flex justify-between items-center text-xs text-gray-700 py-2 border-b border-dashed border-gray-100 last:border-0">
+                            <div class="flex flex-col">
+                                <span class="${nameClass}">${p.name} ${activeMark}</span>
+                                <span class="text-[9px] ${statusColor} lowercase">${statusText}</span>
+                            </div>
+                            <span class="font-mono bg-gray-100 px-2 py-1 rounded text-gray-600 font-bold">${p.runs} <span class="text-[9px] font-normal text-gray-500">(${p.balls})</span></span>
                         </div>`;
                       });
                       teamHtml += `<div class="pl-1">${wHtml}</div>`;
                 } else {
-                      teamHtml += `<p class="text-[10px] text-gray-400 italic pl-1">No wickets yet.</p>`;
+                      teamHtml += `<p class="text-[10px] text-gray-400 italic pl-1">No batting stats.</p>`;
                 }
                 teamHtml += `</div>`;
 
