@@ -37,7 +37,7 @@
 </head>
 <body class="bg-gray-100 min-h-screen font-sans text-gray-900">
 
-    <!-- Increased max-width from max-w-lg to max-w-xl for more space -->
+    <!-- App Container -->
     <div id="app" class="max-w-xl mx-auto bg-white min-h-screen shadow-lg flex flex-col relative">
         
         <!-- Header -->
@@ -314,6 +314,16 @@
                 <div id="history-sync-indicator" class="hidden"><div class="loader !w-4 !h-4"></div></div>
             </div>
 
+            <!-- Search Bar -->
+            <div class="relative mb-4">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <input type="number" id="history-search" oninput="renderHistoryList()" class="block w-full pl-10 p-3 border border-gray-300 rounded-xl bg-gray-50 text-gray-900 focus:ring-2 focus:ring-[#F7631B] outline-none font-bold placeholder-gray-400 transition-colors" placeholder="Search Match ID (e.g. 84392)">
+            </div>
+
             <!-- Tabs -->
             <div class="flex p-1 bg-gray-100 rounded-xl mb-6 shadow-inner">
                 <button id="tab-live" onclick="switchLogTab('live')" class="flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all shadow-sm bg-white text-red-600 border border-red-100">
@@ -341,8 +351,11 @@
              <!-- Reduced horizontal padding from p-4 to px-2 py-4 to give more width to control bar -->
              <div class="bg-gray-900 text-white px-2 py-4 text-center sticky top-0 z-10 shadow-lg">
                 <!-- Header with Teams, Target and Share -->
-                <div class="flex justify-between items-center mb-4 px-2">
-                    <span id="v-display-teams" class="text-xs font-bold text-gray-400 uppercase tracking-widest text-left">Loading...</span>
+                <div class="flex justify-between items-start mb-4 px-2">
+                    <div class="flex flex-col text-left">
+                        <span id="v-display-teams" class="text-xs font-bold text-gray-400 uppercase tracking-widest">Loading...</span>
+                        <span id="v-display-match-id" class="text-[10px] font-mono text-gray-500 mt-0.5">ID: --</span>
+                    </div>
                     <div class="flex items-center gap-2">
                          <span id="v-display-target" class="text-xs text-[#F7631B] font-bold hidden uppercase whitespace-nowrap">TARGET: 0</span>
                          <button onclick="shareCurrentMatch()" class="p-2 bg-gray-800 hover:bg-gray-700 rounded-full text-gray-300 transition-colors shrink-0" title="Share Match Link">
@@ -424,8 +437,11 @@
             <!-- Reduced horizontal padding from p-4 to px-2 py-4 to give more width to control bar -->
             <div class="bg-gray-900 text-white px-2 py-4 text-center">
                 <!-- Header with Teams, Target and Share -->
-                <div class="flex justify-between items-center mb-4 px-2">
-                    <span id="display-teams" class="text-xs font-bold text-gray-400 uppercase tracking-widest text-left">Loading...</span>
+                <div class="flex justify-between items-start mb-4 px-2">
+                    <div class="flex flex-col text-left">
+                        <span id="display-teams" class="text-xs font-bold text-gray-400 uppercase tracking-widest">Loading...</span>
+                        <span id="display-match-id" class="text-[10px] font-mono text-gray-500 mt-0.5">ID: --</span>
+                    </div>
                     <div class="flex items-center gap-2">
                          <span id="display-target" class="text-xs text-[#F7631B] font-bold hidden uppercase whitespace-nowrap">TARGET: 0</span>
                          <button onclick="shareCurrentMatch()" class="p-2 bg-gray-800 hover:bg-gray-700 rounded-full text-gray-300 transition-colors shrink-0" title="Share Match Link">
@@ -1090,9 +1106,12 @@
                 return;
             }
 
+            // Use the 5-digit ID (prefer stored data field, fallback to tracking var)
+            const finalId = data.matchId || idToShare;
+
             // Construct the URL
             const urlObj = new URL(window.location.href);
-            urlObj.searchParams.set('matchId', idToShare);
+            urlObj.searchParams.set('matchId', finalId);
             const shareUrl = urlObj.toString();
 
             // Construct Status Message
@@ -1113,7 +1132,7 @@
             }
 
             const title = data.result ? "Match Result" : "Live Cricket Score";
-            const text = `🏏 ${data.battingTeam} vs ${data.bowlingTeam} ⚾\nScore: ${data.runs}/${data.wickets} (${overs} Overs)\n${statusMsg}\n\n${actionText}`;
+            const text = `🏏 ${data.battingTeam} vs ${data.bowlingTeam} ⚾\nScore: ${data.runs}/${data.wickets} (${overs} Overs)\n${statusMsg}\nMatch ID: ${finalId}\n\n${actionText}`;
 
             // Native Share with Fallback
             if (navigator.share) {
@@ -1538,6 +1557,32 @@
                 return; 
             }
 
+            // Generate 5-Digit Unique ID
+            let newId = "";
+            let isUnique = false;
+            // Attempt generation 3 times to ensure uniqueness (collision highly unlikely with 90k space for small userbase)
+            for(let i=0; i<3; i++) {
+                newId = Math.floor(10000 + Math.random() * 90000).toString();
+                try {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'matches', newId);
+                    const docSnap = await getDoc(docRef);
+                    if (!docSnap.exists()) {
+                        isUnique = true;
+                        break;
+                    }
+                } catch (e) {
+                    console.error("ID Check failed", e);
+                    // If offline or error, we might proceed with risk or break. Proceeding with random ID.
+                    isUnique = true; 
+                    break;
+                }
+            }
+
+            if (!isUnique) {
+                showToast("Network busy, please try again.", "error");
+                return;
+            }
+
             // Explicitly reset all match state for a fresh start
             match.runs = 0; match.wickets = 0; match.balls = 0;
             match.history = []; match.redoStack = []; match.overHistory = [];
@@ -1550,7 +1595,10 @@
             match.maxOvers = parseInt(document.getElementById('max-overs').value);
             match.playerCount = parseInt(document.getElementById('player-count').value);
             match.startTime = new Date().toISOString();
-            currentMatchId = "match_" + Date.now();
+            
+            // Use the numeric ID
+            currentMatchId = newId;
+            
             setupScreen.classList.add('hidden');
             
             // Show Initial Players Modal instead of going directly to scoring
@@ -1576,7 +1624,8 @@
                 const matchRef = doc(db, 'artifacts', appId, 'public', 'data', 'matches', currentMatchId);
                 await setDoc(matchRef, {
                     ...match, lastUpdated: serverTimestamp(), scorerId: user.uid,
-                    status: statusStr
+                    status: statusStr,
+                    matchId: currentMatchId // Ensure ID is saved in doc data too
                 });
                 syncStatus.classList.replace('bg-yellow-400', 'bg-green-400');
             } catch (err) {
@@ -1810,6 +1859,10 @@
 
         function updateDisplay() {
             document.getElementById('display-teams').innerText = `🏏 ${match.battingTeam} vs ⚾ ${match.bowlingTeam}`;
+            // Show ID
+            const idSpan = document.getElementById('display-match-id');
+            if(idSpan) idSpan.innerText = `ID: ${currentMatchId}`;
+
             document.getElementById('runs').innerText = match.runs;
             document.getElementById('wickets').innerText = match.wickets;
             document.getElementById('overs').innerText = formatOvers(match.balls);
@@ -2047,14 +2100,25 @@
 
         function renderHistoryList() {
             const list = document.getElementById('history-list');
+            const searchVal = document.getElementById('history-search')?.value.trim();
             
             if (allMatchesCache.length === 0) { 
                 list.innerHTML = '<div class="text-center py-10 text-gray-400">No match records found.</div>'; 
                 return; 
             }
 
-            const live = allMatchesCache.filter(m => m.status === 'Live' || m.status === 'On Break');
-            const past = allMatchesCache.filter(m => m.status !== 'Live' && m.status !== 'On Break');
+            let filtered = allMatchesCache;
+            if (searchVal) {
+                filtered = allMatchesCache.filter(m => m.id && m.id.includes(searchVal));
+            }
+
+            if (filtered.length === 0) {
+                list.innerHTML = `<div class="text-center py-10 text-gray-400">No matches found for ID "${searchVal}"</div>`;
+                return;
+            }
+
+            const live = filtered.filter(m => m.status === 'Live' || m.status === 'On Break');
+            const past = filtered.filter(m => m.status !== 'Live' && m.status !== 'On Break');
 
             const renderCard = (m) => {
                 const sT = m.startTime ? new Date(m.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '--';
@@ -2086,7 +2150,7 @@
                         <div class="flex justify-between items-start mb-2">
                             <div class="flex flex-col">
                                 <span class="text-[10px] font-bold text-gray-400 uppercase">${m.startTime ? new Date(m.startTime).toLocaleDateString([], {month:'short', day:'numeric'}) : 'Today'}</span>
-                                <span class="text-[9px] text-gray-500">${sT} ${eT ? ' - ' + eT : ''}</span>
+                                <span class="text-[10px] font-mono text-gray-500">ID: ${m.id}</span>
                             </div>
                             <span class="px-2 py-0.5 rounded-full text-[9px] font-bold ${sCol}">${m.status}</span>
                         </div>
@@ -2105,7 +2169,10 @@
 
             let finalHtml = '';
             
-            if (currentLogTab === 'live') {
+            // Only show headings if we are NOT searching specific ID (or show flat list if searching)
+            if (searchVal) {
+                 finalHtml = `<div class="grid gap-4 mt-2">${filtered.map(m => renderCard(m)).join('')}</div>`;
+            } else if (currentLogTab === 'live') {
                 if (live.length > 0) {
                     finalHtml = `
                         <div class="mb-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -2162,11 +2229,18 @@
             viewerScreen.classList.remove('hidden');
             backBtn.classList.remove('hidden');
             
+            // Clean matchId from display purposes if passed via URL param could be cleaner
+            
             const matchRef = doc(db, 'artifacts', appId, 'public', 'data', 'matches', matchId);
             unsubscribeMatch = onSnapshot(matchRef, (docSnap) => {
-                if (docSnap.exists()) updateViewerUI(docSnap.data());
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    // Inject ID if missing in data (backward compatibility)
+                    if(!data.matchId) data.matchId = docSnap.id; 
+                    updateViewerUI(data);
+                }
                 else { 
-                    showToast("This match data was removed.", "error"); 
+                    showToast("Match ID " + matchId + " not found.", "error"); 
                     stopWatching(); 
                 }
             }, (err) => {
@@ -2178,6 +2252,11 @@
         function updateViewerUI(data) {
             viewerMatchData = data; // Store latest data for sharing
             document.getElementById('v-display-teams').innerText = `🏏 ${data.battingTeam} vs ⚾ ${data.bowlingTeam}`;
+            
+            // Show ID
+            const idSpan = document.getElementById('v-display-match-id');
+            if(idSpan) idSpan.innerText = `ID: ${data.matchId || activeViewerMatchId}`;
+
             document.getElementById('v-runs').innerText = data.runs; document.getElementById('v-wickets').innerText = data.wickets;
             document.getElementById('v-overs').innerText = formatOvers(data.balls); document.getElementById('v-limit').innerText = data.maxOvers;
             
