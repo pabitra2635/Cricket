@@ -20,9 +20,46 @@
             @apply min-w-[36px] h-9 rounded-lg flex items-center justify-center text-sm font-black border shadow-sm transition-all transform hover:-translate-y-0.5; 
         }
         
-        .bg-brand-primary { background-color: #F7631B; }
+        /* Animated Brand Gradient */
+        .bg-brand-primary { 
+            background: linear-gradient(135deg, #F7631B, #fb923c, #ec4899, #F7631B);
+            background-size: 300% 300%;
+            animation: brandShimmer 6s ease infinite;
+        }
+        
+        @keyframes brandShimmer {
+             0% { background-position: 0% 50%; }
+             50% { background-position: 100% 50%; }
+             100% { background-position: 0% 50%; }
+        }
+
         .text-brand-primary { color: #F7631B; }
         .border-brand-primary { border-color: #F7631B; }
+        
+        /* Animated Body Background */
+        .animated-body-bg {
+             background: linear-gradient(-45deg, #f3f4f6, #fff7ed, #ffedd5, #fce7f3);
+             background-size: 400% 400%;
+             animation: bodyGradient 15s ease infinite;
+        }
+        @keyframes bodyGradient {
+             0% { background-position: 0% 50%; }
+             50% { background-position: 100% 50%; }
+             100% { background-position: 0% 50%; }
+        }
+
+        /* Setup Screen Specific Animation - Stronger Gradient */
+        .setup-bg-animate {
+            background: linear-gradient(135deg, #ffffff 0%, #fff7ed 25%, #ffedd5 50%, #fff7ed 75%, #ffffff 100%);
+            background-size: 400% 400%;
+            animation: setupGradient 10s ease infinite;
+        }
+        @keyframes setupGradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
         .loader { border: 3px solid #f3f3f3; border-top: 3px solid #F7631B; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .break-overlay { background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); }
@@ -53,7 +90,7 @@
         }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen font-sans text-gray-900">
+<body class="min-h-screen font-sans text-gray-900 animated-body-bg">
 
     <!-- App Container -->
     <div id="app" class="max-w-xl mx-auto bg-white min-h-screen shadow-lg flex flex-col relative">
@@ -87,7 +124,7 @@
         </header>
 
         <!-- Setup Screen -->
-        <div id="setup-screen" class="p-6 flex-grow flex flex-col">
+        <div id="setup-screen" class="p-6 flex-grow flex flex-col setup-bg-animate">
             <div class="text-center mb-6">
                 <img src="https://c8.alamy.com/comp/2C0RN9G/cricket-bat-and-ball-badge-illustration-2C0RN9G.jpg" alt="Cricket Badge" class="mx-auto h-24 w-24 mb-2 object-contain rounded-full shadow-sm">
                 <h2 class="text-lg font-semibold text-gray-700">Tournament Setup</h2>
