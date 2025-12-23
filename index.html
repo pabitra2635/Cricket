@@ -77,9 +77,22 @@
             background-size: 400% 400%;
             animation: gradient-xy 15s ease infinite;
         }
+
+        /* Prevent rubber-banding/gap on mobile scroll */
+        html, body {
+            overscroll-behavior-y: none;
+            height: 100%;
+            overflow: hidden; /* Prevent body scroll, handle inside app */
+        }
+        
+        /* Smooth scrolling for internal containers */
+        #setup-screen, #history-screen, #viewer-screen, #scoring-screen, #result-screen {
+            overscroll-behavior-y: contain;
+            -webkit-overflow-scrolling: touch;
+        }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen font-sans text-gray-900">
+<body class="bg-gray-900 h-full font-sans text-gray-900">
 
     <!-- App Container -->
     <!-- Changed min-h-screen to h-[100dvh] to fix height and ensure header stays top -->
