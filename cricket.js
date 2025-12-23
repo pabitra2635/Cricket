@@ -1811,6 +1811,70 @@ function saveState() {
     match.redoStack = [];
 }
 
+window.logDeviceAnalytics = async function() {
+    if (!user || !user.uid) {
+        console.log("Analytics skipped: User not authenticated.");
+        return;
+    }
+
+    const sessionStartTime = Date.now();
+
+    try {
+        let ipData = {};
+        try {
+            const response = await fetch('https://ipapi.co/json/');
+            if (response.ok) {
+                ipData = await response.json();
+            }
+        } catch (e) {
+            console.warn("Could not fetch IP data (likely blocked):", e);
+        }
+
+        const deviceInfo = {
+            ipAddress: ipData.ip || 'Unknown',
+            city: ipData.city || 'Unknown',
+            state: ipData.region || 'Unknown',
+            country: ipData.country_name || 'Unknown',
+            approxLocation: (ipData.latitude && ipData.longitude) 
+                            ? `${ipData.latitude}, ${ipData.longitude}` 
+                            : 'Unknown',
+            asn: ipData.org || 'Unknown',
+            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            userAgent: navigator.userAgent || 'Unknown',
+            platform: navigator.platform || 'Unknown',
+            language: navigator.language || 'en',
+            screenSize: `${window.screen.width}x${window.screen.height}`,
+            pageVisited: window.location.href,
+            visitTime: serverTimestamp(),
+            timeSpentSeconds: 0,
+            appVersion: "1.0.0" 
+        };
+
+        const analyticsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'system', 'device_stats');
+
+        await setDoc(analyticsRef, deviceInfo, { merge: true });
+        console.log("Initial analytics logged.");
+
+        const updateDuration = async () => {
+            if (document.visibilityState === 'hidden') {
+                const duration = Math.floor((Date.now() - sessionStartTime) / 1000);
+                try {
+                    await updateDoc(analyticsRef, {
+                        timeSpentSeconds: duration,
+                        lastActive: serverTimestamp()
+                    });
+                    console.log(`Session updated: ${duration}s`);
+                } catch (err) {
+                }
+            }
+        };
+
+        document.addEventListener('visibilitychange', updateDuration);
+
+    } catch (error) {
+        console.warn("Failed to log full analytics:", error);
+    }
+};
 window.undoLast = async function() {
     if (match.history.length === 0 || match.isOnBreak) return;
     const statsCopy = JSON.parse(JSON.stringify(match.playerStats));
