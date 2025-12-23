@@ -77,7 +77,12 @@
             animation: coin-y-spin 2s infinite linear;
         }
 
-        /* Prevent elastic scrolling on mobile to fix bottom gap */
+        /* Prevent elastic scrolling and fix white gap at bottom */
+        html {
+            background-color: #f3f4f6; /* Matches bg-gray-100 */
+            overscroll-behavior-y: none;
+        }
+        
         body {
             overscroll-behavior-y: none;
         }
