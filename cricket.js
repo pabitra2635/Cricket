@@ -723,6 +723,34 @@ window.logDeviceAnalytics = async function() {
             console.warn("Analytics: IP fetch blocked/failed.", e);
         }
 
+        // --- NEW: GPU Renderer (Graphics Card Info) ---
+        const getGPUInfo = () => {
+            try {
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                if (!gl) return 'Unknown';
+                const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+                return debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : 'Unknown';
+            } catch (e) {
+                return 'Unknown';
+            }
+        };
+
+        // --- NEW: Battery Status (Async) ---
+        const getBatteryInfo = async () => {
+            if ('getBattery' in navigator) {
+                try {
+                    const battery = await navigator.getBattery();
+                    return {
+                        level: Math.round(battery.level * 100) + '%',
+                        charging: battery.charging
+                    };
+                } catch (e) { return null; }
+            }
+            return null;
+        };
+        const batteryData = await getBatteryInfo();
+
         const getPerformanceMetrics = () => {
             const navEntry = performance.getEntriesByType("navigation")[0] || {};
             const paintEntry = performance.getEntriesByName("first-contentful-paint")[0] || {};
@@ -740,8 +768,9 @@ window.logDeviceAnalytics = async function() {
             effectiveType: connection.effectiveType || 'unknown',
             downlink: connection.downlink || 0,
             rtt: connection.rtt || 0,
-            saveData: connection.saveData || false
-        } : { type: 'unknown' };
+            saveData: connection.saveData || false,
+            online: navigator.onLine // NEW: Online status
+        } : { type: 'unknown', online: navigator.onLine };
 
         const storageInfo = {
             cookiesEnabled: navigator.cookieEnabled,
@@ -767,13 +796,21 @@ window.logDeviceAnalytics = async function() {
                 language: navigator.language || 'en',
                 cores: navigator.hardwareConcurrency || 'Unknown',
                 screen: `${window.screen.width}x${window.screen.height}`,
-                pixelRatio: window.devicePixelRatio || 1
+                pixelRatio: window.devicePixelRatio || 1,
+                gpuRenderer: getGPUInfo(), // NEW: GPU
+                isBot: /bot|googlebot|crawler|spider|robot|crawling/i.test(navigator.userAgent) || navigator.webdriver, // NEW: Bot Check
+                battery: batteryData // NEW: Battery
+            },
+            preferences: { // NEW: User Preferences
+                darkMode: window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches,
+                reducedMotion: window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+                orientation: (screen.orientation || {}).type || 'unknown'
             },
             pageVisited: window.location.pathname,
             fullUrl: window.location.href,
             referrer: storageInfo.referrer,
             visitTime: serverTimestamp(),
-            appVersion: "1.1.0",
+            appVersion: "1.2.0",
             network: networkInfo,
             storage: storageInfo,
             performance: getPerformanceMetrics(),
@@ -783,6 +820,7 @@ window.logDeviceAnalytics = async function() {
             }
         };
 
+        // Save directly to User document
         const analyticsRef = doc(db, 'artifacts', appId, 'users', user.uid);
         
         await setDoc(analyticsRef, deviceInfo, { merge: true });
@@ -823,7 +861,6 @@ window.logDeviceAnalytics = async function() {
         const updateSessionStats = async () => {
             if (document.visibilityState === 'hidden') {
                 const duration = Math.floor((Date.now() - sessionStartTime) / 1000);
-                
                 const finalPerf = getPerformanceMetrics();
 
                 try {
@@ -843,7 +880,6 @@ window.logDeviceAnalytics = async function() {
         };
 
         document.addEventListener('visibilitychange', updateSessionStats);
-        
         window.addEventListener('beforeunload', updateSessionStats);
 
     } catch (error) {
