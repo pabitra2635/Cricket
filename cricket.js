@@ -706,6 +706,11 @@ window.logDeviceAnalytics = async function() {
     }
 
     const sessionStartTime = Date.now();
+    const sessionId = crypto.randomUUID();
+
+    let totalClicks = 0;
+    let maxScrollPercentage = 0;
+    let clipboardEvents = { copy: 0, paste: 0, cut: 0 };
 
     try {
         let ipData = {};
@@ -715,54 +720,137 @@ window.logDeviceAnalytics = async function() {
                 ipData = await response.json();
             }
         } catch (e) {
-            console.warn("Could not fetch IP data (likely blocked):", e);
+            console.warn("Analytics: IP fetch blocked/failed.", e);
         }
 
-        const deviceInfo = {
-            ipAddress: ipData.ip || 'Unknown',
-            city: ipData.city || 'Unknown',
-            state: ipData.region || 'Unknown',
-            country: ipData.country_name || 'Unknown',
-            approxLocation: (ipData.latitude && ipData.longitude) 
-                            ? `${ipData.latitude}, ${ipData.longitude}` 
-                            : 'Unknown',
-            asn: ipData.org || 'Unknown',
-            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            userAgent: navigator.userAgent || 'Unknown',
-            platform: navigator.platform || 'Unknown',
-            language: navigator.language || 'en',
-            screenSize: `${window.screen.width}x${window.screen.height}`,
-            pageVisited: window.location.href,
-            visitTime: serverTimestamp(),
-            timeSpentSeconds: 0,
-            appVersion: "1.0.0" 
+        const getPerformanceMetrics = () => {
+            const navEntry = performance.getEntriesByType("navigation")[0] || {};
+            const paintEntry = performance.getEntriesByName("first-contentful-paint")[0] || {};
+            
+            return {
+                loadTime: navEntry.loadEventEnd ? (navEntry.loadEventEnd - navEntry.startTime).toFixed(2) + 'ms' : 'Pending',
+                domInteractive: navEntry.domInteractive ? (navEntry.domInteractive - navEntry.startTime).toFixed(2) + 'ms' : 'Unknown',
+                firstContentfulPaint: paintEntry.startTime ? paintEntry.startTime.toFixed(2) + 'ms' : 'Unknown',
+                memoryUsage: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1024 / 1024) + 'MB' : 'N/A'
+            };
         };
 
-        const analyticsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'system', 'device_stats');
+        const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        const networkInfo = connection ? {
+            effectiveType: connection.effectiveType || 'unknown',
+            downlink: connection.downlink || 0,
+            rtt: connection.rtt || 0,
+            saveData: connection.saveData || false
+        } : { type: 'unknown' };
 
+        const storageInfo = {
+            cookiesEnabled: navigator.cookieEnabled,
+            localStorageAvailable: typeof window.localStorage !== 'undefined',
+            sessionStorageAvailable: typeof window.sessionStorage !== 'undefined',
+            historyLength: window.history.length,
+            referrer: document.referrer || 'Direct'
+        };
+
+        const deviceInfo = {
+            sessionId: sessionId,
+            ipAddress: ipData.ip || 'Unknown',
+            geo: {
+                city: ipData.city || 'Unknown',
+                region: ipData.region || 'Unknown',
+                country: ipData.country_name || 'Unknown',
+                coords: (ipData.latitude && ipData.longitude) ? `${ipData.latitude}, ${ipData.longitude}` : null,
+                asn: ipData.org || 'Unknown'
+            },
+            system: {
+                userAgent: navigator.userAgent || 'Unknown',
+                platform: navigator.platform || 'Unknown',
+                language: navigator.language || 'en',
+                cores: navigator.hardwareConcurrency || 'Unknown',
+                screen: `${window.screen.width}x${window.screen.height}`,
+                pixelRatio: window.devicePixelRatio || 1
+            },
+            pageVisited: window.location.pathname,
+            fullUrl: window.location.href,
+            referrer: storageInfo.referrer,
+            visitTime: serverTimestamp(),
+            appVersion: "1.1.0",
+            network: networkInfo,
+            storage: storageInfo,
+            performance: getPerformanceMetrics(),
+            metrics: {
+                pageViews: increment(1),
+                sessionCount: increment(1)
+            }
+        };
+
+        const analyticsRef = doc(db, 'artifacts', appId, 'users', user.uid);
+        
         await setDoc(analyticsRef, deviceInfo, { merge: true });
-        console.log("Initial analytics logged.");
+        console.log("Analytics: Initial log sent.");
 
-        const updateDuration = async () => {
+        const updateScrollDepth = () => {
+            const scrollTop = window.scrollY || document.documentElement.scrollTop;
+            const winHeight = window.innerHeight;
+            const docHeight = document.documentElement.scrollHeight;
+            const totalDocScrollLength = docHeight - winHeight;
+            
+            if (totalDocScrollLength <= 0) return;
+
+            const scrollPercent = Math.floor((scrollTop / totalDocScrollLength) * 100);
+            if (scrollPercent > maxScrollPercentage) {
+                maxScrollPercentage = scrollPercent;
+            }
+        };
+        
+        let scrollTimeout;
+        document.addEventListener('scroll', () => {
+            if (!scrollTimeout) {
+                scrollTimeout = setTimeout(() => {
+                    updateScrollDepth();
+                    scrollTimeout = null;
+                }, 200);
+            }
+        });
+
+        document.addEventListener('click', () => {
+            totalClicks++;
+        });
+
+        document.addEventListener('copy', () => clipboardEvents.copy++);
+        document.addEventListener('cut', () => clipboardEvents.cut++);
+        document.addEventListener('paste', () => clipboardEvents.paste++);
+
+        const updateSessionStats = async () => {
             if (document.visibilityState === 'hidden') {
                 const duration = Math.floor((Date.now() - sessionStartTime) / 1000);
+                
+                const finalPerf = getPerformanceMetrics();
+
                 try {
                     await updateDoc(analyticsRef, {
-                        timeSpentSeconds: duration,
-                        lastActive: serverTimestamp()
+                        "metrics.timeSpentSeconds": duration,
+                        "metrics.lastActive": serverTimestamp(),
+                        "metrics.maxScrollDepth": maxScrollPercentage,
+                        "metrics.totalClicks": totalClicks,
+                        "metrics.clipboard": clipboardEvents,
+                        "performance": finalPerf
                     });
-                    console.log(`Session updated: ${duration}s`);
+                    console.log(`Analytics: Updated session (Duration: ${duration}s, Scroll: ${maxScrollPercentage}%)`);
                 } catch (err) {
+                    console.warn("Analytics: Failed to update session stats", err);
                 }
             }
         };
 
-        document.addEventListener('visibilitychange', updateDuration);
+        document.addEventListener('visibilitychange', updateSessionStats);
+        
+        window.addEventListener('beforeunload', updateSessionStats);
 
     } catch (error) {
-        console.warn("Failed to log full analytics:", error);
+        console.error("Analytics Critical Failure:", error);
     }
 };
+
 const initAuth = async () => {
     try {
         const cred = await signInAnonymously(auth);
