@@ -113,6 +113,50 @@ window.showToast = function(message, type = 'info') {
     }, 3500);
 };
 
+// --- Screen Wake Lock Logic ---
+let wakeLock = null;
+let isAwakeNeeded = true; 
+
+window.enableWakeLock = async function() {
+    if (wakeLock !== null) return;
+
+    try {
+        if ('wakeLock' in navigator) {
+            wakeLock = await navigator.wakeLock.request('screen');
+            console.log('Screen Wake Lock active (Global)');
+        }
+    } catch (err) {
+        console.warn('Wake Lock error (likely needs user gesture):', err);
+    }
+};
+
+window.disableWakeLock = async function() {
+    
+    console.log('Wake Lock release skipped (Global Policy)');
+};
+
+
+window.enableWakeLock();
+
+
+const initWakeLockOnInteraction = async () => {
+    await window.enableWakeLock();
+    
+    if (wakeLock) {
+        document.removeEventListener('click', initWakeLockOnInteraction);
+        document.removeEventListener('touchstart', initWakeLockOnInteraction);
+    }
+};
+
+document.addEventListener('click', initWakeLockOnInteraction);
+document.addEventListener('touchstart', initWakeLockOnInteraction);
+
+document.addEventListener('visibilitychange', async () => {
+    if (isAwakeNeeded && document.visibilityState === 'visible' && wakeLock === null) {
+        await window.enableWakeLock();
+    }
+});
+
 // --- Confirmation Modal System ---
 const confirmModal = document.getElementById('confirm-modal');
 const confirmMsg = document.getElementById('confirm-msg');
