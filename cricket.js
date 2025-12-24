@@ -723,7 +723,21 @@ window.logDeviceAnalytics = async function() {
             console.warn("Analytics: IP fetch blocked/failed.", e);
         }
 
-        // --- NEW: GPU Renderer (Graphics Card Info) ---
+        let userMatchCount = 0;
+        try {
+            const matchesCol = collection(db, 'artifacts', appId, 'public', 'data', 'matches');
+            const matchesSnap = await getDocs(matchesCol);
+            
+            matchesSnap.forEach(doc => {
+                const data = doc.data();
+                if (data.scorerId === user.uid) {
+                    userMatchCount++;
+                }
+            });
+        } catch (e) {
+            console.warn("Analytics: Failed to count user matches", e);
+        }
+
         const getGPUInfo = () => {
             try {
                 const canvas = document.createElement('canvas');
@@ -735,8 +749,7 @@ window.logDeviceAnalytics = async function() {
                 return 'Unknown';
             }
         };
-
-        // --- NEW: Battery Status (Async) ---
+        
         const getBatteryInfo = async () => {
             if ('getBattery' in navigator) {
                 try {
@@ -769,7 +782,7 @@ window.logDeviceAnalytics = async function() {
             downlink: connection.downlink || 0,
             rtt: connection.rtt || 0,
             saveData: connection.saveData || false,
-            online: navigator.onLine // NEW: Online status
+            online: navigator.onLine
         } : { type: 'unknown', online: navigator.onLine };
 
         const storageInfo = {
@@ -797,11 +810,11 @@ window.logDeviceAnalytics = async function() {
                 cores: navigator.hardwareConcurrency || 'Unknown',
                 screen: `${window.screen.width}x${window.screen.height}`,
                 pixelRatio: window.devicePixelRatio || 1,
-                gpuRenderer: getGPUInfo(), // NEW: GPU
-                isBot: /bot|googlebot|crawler|spider|robot|crawling/i.test(navigator.userAgent) || navigator.webdriver, // NEW: Bot Check
-                battery: batteryData // NEW: Battery
+                gpuRenderer: getGPUInfo(),
+                isBot: /bot|googlebot|crawler|spider|robot|crawling/i.test(navigator.userAgent) || navigator.webdriver,
+                battery: batteryData
             },
-            preferences: { // NEW: User Preferences
+            preferences: {
                 darkMode: window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches,
                 reducedMotion: window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
                 orientation: (screen.orientation || {}).type || 'unknown'
@@ -816,15 +829,15 @@ window.logDeviceAnalytics = async function() {
             performance: getPerformanceMetrics(),
             metrics: {
                 pageViews: increment(1),
-                sessionCount: increment(1)
+                sessionCount: increment(1),
+                totalMatchesCreated: userMatchCount 
             }
         };
 
-        // Save directly to User document
         const analyticsRef = doc(db, 'artifacts', appId, 'users', user.uid);
         
         await setDoc(analyticsRef, deviceInfo, { merge: true });
-        console.log("Analytics: Initial log sent.");
+        console.log(`Analytics: Initial log sent. Matches found: ${userMatchCount}`);
 
         const updateScrollDepth = () => {
             const scrollTop = window.scrollY || document.documentElement.scrollTop;
