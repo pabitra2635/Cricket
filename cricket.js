@@ -1432,7 +1432,6 @@ window.startMatch = function() {
     // Open Squad Entry Modal
     openSquadSetup(bTeam, boTeam, match.playerCount);
 };
-
 window.generateMatchIdAndStart = async function() {
     // Generate 5-Digit Unique ID
     let newId = "";
@@ -2445,30 +2444,16 @@ function updateViewerUI(data) {
         videoContainer.classList.add('hidden');
         videoContainer.innerHTML = '';
     }
-
-    // --- Handle Overlay ---
-    const vB = document.getElementById('v-break-overlay');
-    if (data.status === "On Break" || data.status === "Abandoned") {
-        vB.classList.remove('hidden');
-        if (data.status === "Abandoned") {
-            document.getElementById('v-overlay-icon').innerText = "☁️";
-            document.getElementById('v-overlay-title').innerText = "Abandoned";
-            document.getElementById('v-overlay-desc').innerText = "This match was called off.";
-            document.getElementById('v-overlay-desc').className = "text-sm text-gray-300 mt-2";
-        } else {
-            document.getElementById('v-overlay-icon').innerText = "☕";
-            document.getElementById('v-overlay-title').innerText = "Break Time";
-            document.getElementById('v-overlay-desc').innerText = "Play is currently paused.";
-            document.getElementById('v-overlay-desc').className = "text-sm text-gray-300 mt-2";
-        }
-    } else {
-        vB.classList.add('hidden');
-    }
-
     // --- Generate Full Scorecard with Result Banner ---
+// --- Handle Overlay (UPDATED: Force Hide Shadow Effect) ---
+    const vB = document.getElementById('v-break-overlay');
+    if (vB) vB.classList.add('hidden'); // Always hide the shadow overlay
+
+    // --- Generate Full Scorecard with Status Banner ---
     let resultBanner = '';
+
     if (data.status === "Finished") {
-        // Calculate MOTM for viewer
+        // ... (Existing Winner Logic) ...
         const motm = calculateMOTM(data.playerStats || {});
         let motmBadge = '';
         if (motm) {
@@ -2487,6 +2472,26 @@ function updateViewerUI(data) {
                 <h3 class="text-lg font-black text-gray-800 uppercase tracking-tight">Match Finished</h3>
                 <p class="text-xl font-bold text-[#F7631B] mt-1">${data.result || 'Result Declared'}</p>
                 ${motmBadge}
+            </div>
+        `;
+    } 
+    // --- NEW: Abandoned Box (Red Style) ---
+    else if (data.status === "Abandoned") {
+        resultBanner = `
+            <div class="bg-gradient-to-r from-red-50 to-red-100 border border-red-200 p-4 rounded-xl text-center mb-4">
+                <div class="text-4xl mb-2">☁️</div>
+                <h3 class="text-lg font-black text-gray-800 uppercase tracking-tight">Match Abandoned</h3>
+                <p class="text-sm font-bold text-red-600 mt-1">This match was called off.</p>
+            </div>
+        `;
+    }
+    // --- NEW: Break Box (Blue Style) ---
+    else if (data.status === "On Break") {
+        resultBanner = `
+            <div class="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 p-4 rounded-xl text-center mb-4">
+                <div class="text-4xl mb-2">☕</div>
+                <h3 class="text-lg font-black text-gray-800 uppercase tracking-tight">Match on Break</h3>
+                <p class="text-sm font-bold text-blue-600 mt-1">Play is currently paused.</p>
             </div>
         `;
     }
