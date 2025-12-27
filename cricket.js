@@ -252,11 +252,12 @@ injectEditPlayerModal();
 // 2. Open Modal Logic
 window.openPlayerModal = function(role) {
     // 1. Restriction: Allow only at start of over
-    if (match.balls > 0 && match.balls % 6 !== 0) {
-        showToast("Switches only allowed at start of over", "warning");
-        return;
-    }
-
+    if (role === 'bowler') {
+            if (match.balls > 0 && match.balls % 6 !== 0) {
+                showToast("Bowler can only be changed at start of over", "warning");
+                return;
+            }
+        }
     currentEditRole = role; 
 
     // Identify Team and Current Player
