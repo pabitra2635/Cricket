@@ -210,9 +210,187 @@ function calculateMOTM(stats) {
 }
 
 // --- Player Edit System ---
+// 1. Force the Modal to Exist
+function injectEditPlayerModal() {
+    // Remove old one if it exists to prevent duplicates
+    const existing = document.getElementById('edit-player-modal');
+    if (existing) existing.remove();
+
+    const modalHTML = `
+    <div id="edit-player-modal" class="fixed inset-0 z-[150] flex items-center justify-center hidden p-4">
+        <div class="absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity" onclick="window.closeEditPlayerModal()"></div>
+        
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all scale-100 animate-in fade-in zoom-in duration-200">
+            <div class="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                <h3 class="text-lg font-black text-gray-800 uppercase tracking-tight">Switch Player</h3>
+                <button onclick="window.closeEditPlayerModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            
+            <div class="p-6 space-y-6">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Select Replacement</label>
+                    <select id="edit-player-select" class="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-800 focus:outline-none focus:border-brand-primary transition-colors text-lg shadow-sm">
+                        <option value="">-- Choose Player --</option>
+                    </select>
+                </div>
+
+                <button onclick="window.confirmPlayerEdit()" class="w-full bg-brand-primary text-white font-bold py-4 rounded-xl shadow-lg uppercase tracking-widest hover:opacity-90 active:scale-95 transition-all">
+                    Confirm Switch
+                </button>
+            </div>
+        </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+// Call this immediately to ensure modal is created
+injectEditPlayerModal();
+
+// 2. Open Modal Logic
+// 2. Open Modal Logic
 window.openPlayerModal = function(role) {
-    // Editing player names is disabled during the match
-    return;
+    // 1. Restriction: Allow only at start of over
+    if (match.balls > 0 && match.balls % 6 !== 0) {
+        showToast("Switches only allowed at start of over", "warning");
+        return;
+    }
+
+    currentEditRole = role; 
+
+    // Identify Team and Current Player
+    let currentName = "";
+    let teamName = "";
+    
+    if (role === 'striker') {
+        currentName = match.striker;
+        teamName = match.battingTeam;
+    } else if (role === 'nonStriker') {
+        currentName = match.nonStriker;
+        teamName = match.battingTeam;
+    } else if (role === 'bowler') {
+        currentName = match.bowler;
+        teamName = match.bowlingTeam;
+    }
+
+    // Populate Dropdown
+    const select = document.getElementById('edit-player-select');
+    if (!select) {
+        injectEditPlayerModal();
+        setTimeout(() => window.openPlayerModal(role), 100);
+        return;
+    }
+
+    select.innerHTML = '<option value="">-- Choose Player --</option>';
+    
+    const squad = match.squads && match.squads[teamName] ? match.squads[teamName] : [];
+
+    // --- NEW: Find who bowled the last over ---
+    let lastBowlerName = null;
+    if (match.ballLogs.length > 0) {
+        // The bowler of the very last ball recorded is the "previous bowler"
+        lastBowlerName = match.ballLogs[match.ballLogs.length - 1].bowler;
+    }
+
+    // --- FILTER LOGIC ---
+    const available = squad.filter(p => {
+        // 1. Always allow selecting the current player (so you can keep them)
+        if (p === currentName) return true;
+
+        // 2. Hide if Player is OUT
+        const pStats = match.playerStats[p];
+        if (pStats && pStats.isOut) return false;
+
+        // 3. Hide if Player is currently on the crease (Batting Partner or Current Bowler)
+        // We exclude 'self' check here because we handled it in step 1
+        const isOnCrease = (p === match.striker || p === match.nonStriker || p === match.bowler);
+        if (isOnCrease) return false;
+
+        // 4. Specific Rule: If selecting BOWLER, hide the previous over's bowler
+        if (role === 'bowler' && p === lastBowlerName) return false;
+
+        return true;
+    });
+
+    if (available.length === 0) {
+        // Fallback if everyone is out/unavailable
+        const opt = document.createElement('option');
+        opt.value = currentName;
+        opt.innerText = currentName + " (Current)";
+        opt.selected = true;
+        select.appendChild(opt);
+    } else {
+        available.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p;
+            opt.innerText = p;
+            if (p === currentName) opt.selected = true;
+            select.appendChild(opt);
+        });
+    }
+
+    // Show Modal
+    const modal = document.getElementById('edit-player-modal');
+    modal.classList.remove('hidden');
+    modal.querySelector('.relative').classList.add('modal-enter');
+    setTimeout(() => {
+        modal.querySelector('.relative').classList.remove('modal-enter');
+        modal.querySelector('.relative').classList.add('modal-active');
+    }, 10);
+};
+
+window.closeEditPlayerModal = function() {
+    const modal = document.getElementById('edit-player-modal');
+    if (modal) modal.classList.add('hidden');
+    currentEditRole = null; // FIXED variable name
+};
+
+// 3. Confirm Switch Logic
+window.confirmPlayerEdit = function() {
+    const select = document.getElementById('edit-player-select');
+    const newName = select.value;
+    
+    if (!newName) {
+        showToast("Please select a player", "error");
+        return;
+    }
+
+    // Check if name actually changed
+    let currentName = "";
+    if (currentEditRole === 'striker') currentName = match.striker;
+    else if (currentEditRole === 'nonStriker') currentName = match.nonStriker;
+    else if (currentEditRole === 'bowler') currentName = match.bowler;
+
+    if (newName === currentName) {
+        window.closeEditPlayerModal();
+        return;
+    }
+
+    // Perform the Switch
+    if (currentEditRole === 'striker') match.striker = newName;
+    else if (currentEditRole === 'nonStriker') match.nonStriker = newName;
+    else if (currentEditRole === 'bowler') match.bowler = newName;
+
+    // Initialize stats for new player if they don't exist
+    if (!match.playerStats[newName]) {
+        match.playerStats[newName] = { 
+            runs: 0, balls: 0, wickets: 0, runsConceded: 0, ballsBowled: 0, isOut: false, 
+            team: (currentEditRole === 'bowler' ? match.bowlingTeam : match.battingTeam)
+        };
+    }
+
+    // Add to lists
+    if (currentEditRole === 'bowler') {
+        if (!match.bowlersList.includes(newName)) match.bowlersList.push(newName);
+    } else {
+        if (!match.battingOrder.includes(newName)) match.battingOrder.push(newName);
+    }
+
+    updateDisplay();
+    syncToCloud();
+    showToast(`Switched to ${newName}`, "success");
+    window.closeEditPlayerModal();
 };
 
 window.savePlayerName = async function() {
@@ -328,6 +506,7 @@ window.submitNextBowler = async function() {
     }
 
     match.bowler = finalBowler;
+    match.overHistory = [];
     document.getElementById('next-bowler-modal').classList.add('hidden');
     document.getElementById('new-bowler-name').value = '';
     document.getElementById('existing-bowler-select').value = '';
@@ -2653,7 +2832,6 @@ function updateViewerUI(data) {
         renderCommentary('viewer-commentary');
     }
 }
-
 window.stopWatching = function() {
     activeViewerMatchId = null; // Reset
     // Clear URL param if present
