@@ -616,12 +616,19 @@
                 </div>
             </div>
 
-            <div class="p-4 bg-gray-50 flex items-center gap-2">
-                <button onclick="undoLast()" class="flex-1 py-3 text-[10px] font-bold text-gray-500 border rounded-lg bg-white hover:bg-gray-100 uppercase transition-all shadow-sm">Undo</button>
-                <button onclick="toggleBreak()" class="flex-1 py-3 text-[10px] font-bold text-blue-600 border border-blue-100 rounded-lg bg-white hover:bg-blue-50 uppercase transition-all shadow-sm">Break</button>
-                <button onclick="redoLast()" class="flex-1 py-3 text-[10px] font-bold text-[#F7631B] border border-orange-100 rounded-lg bg-white hover:bg-orange-50 uppercase transition-all shadow-sm">Redo</button>
-                <div id="save-loader" class="hidden shrink-0"><div class="loader"></div></div>
-            </div>
+<div class="p-4 bg-gray-50 flex items-center gap-2">
+    <button onclick="undoLast()" class="flex-1 py-3 text-[10px] font-bold text-gray-500 border rounded-lg bg-white hover:bg-gray-100 uppercase transition-all shadow-sm">Undo</button>
+    
+    <button onclick="addCommentaryNote()" class="flex-1 py-3 text-[10px] font-bold text-indigo-600 border border-indigo-100 rounded-lg bg-white hover:bg-indigo-50 uppercase transition-all shadow-sm">
+        💬 Note
+    </button>
+
+    <button onclick="toggleBreak()" class="flex-1 py-3 text-[10px] font-bold text-blue-600 border border-blue-100 rounded-lg bg-white hover:bg-blue-50 uppercase transition-all shadow-sm">Break</button>
+    
+    <button onclick="redoLast()" class="flex-1 py-3 text-[10px] font-bold text-[#F7631B] border border-orange-100 rounded-lg bg-white hover:bg-orange-50 uppercase transition-all shadow-sm">Redo</button>
+    
+    <div id="save-loader" class="hidden shrink-0"><div class="loader"></div></div>
+</div>
         </div>
 
         <!-- Result Screen -->
