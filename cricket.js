@@ -2068,7 +2068,30 @@ function endMatch(winner) {
     syncToCloud();
     showToast("Match Finished - Summary Generated", "success");
 }
+// --- Custom Commentary Logic ---
+window.addCommentaryNote = async function() {
+    const text = prompt("Enter commentary note:");
+    if (!text || !text.trim()) return;
 
+    saveState(); // Ensure this action can be undone
+
+    // Calculate current over timestamp (e.g. 2.4)
+    const overs = formatOvers(match.balls);
+
+    // Push special log object
+    match.ballLogs.push({
+        overs: overs,
+        bowler: match.bowler,
+        batsman: match.striker,
+        outcome: 'MSG', // Special tag for messages
+        description: text.trim(),
+        isExtra: true   // Treat as extra so it doesn't count as a legal ball
+    });
+
+    updateDisplay();
+    await syncToCloud();
+    showToast("Commentary added", "success");
+};
 function renderCommentary(containerId) {
     const container = document.getElementById(containerId);
     if (!match.ballLogs || match.ballLogs.length === 0) {
@@ -2080,6 +2103,20 @@ function renderCommentary(containerId) {
     const reversedLogs = [...match.ballLogs].reverse();
     
     container.innerHTML = reversedLogs.map(log => {
+        // --- NEW: Special Layout for Custom Messages ---
+        if (log.outcome === 'MSG') {
+            return `
+                <div class="flex items-start gap-3 py-2 border-b border-gray-100 last:border-0 bg-indigo-50/50 -mx-2 px-2">
+                    <span class="text-xs font-mono font-bold text-gray-400 w-8 pt-0.5">${log.overs}</span>
+                    <div class="flex-1">
+                        <p class="text-xs font-bold text-indigo-700 uppercase tracking-wider mb-0.5">Update</p>
+                        <p class="text-xs text-gray-700 font-medium italic">"${log.description}"</p>
+                    </div>
+                </div>
+            `;
+        }
+        // -----------------------------------------------
+
         let outcomeClass = "bg-gray-200 text-gray-700";
         if (log.outcome === '4') outcomeClass = "bg-blue-100 text-blue-800 border border-blue-200";
         if (log.outcome === '6') outcomeClass = "bg-orange-100 text-orange-800 border border-orange-200";
